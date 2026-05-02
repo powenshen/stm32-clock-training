@@ -27,12 +27,6 @@
 #include "app_clock.h"
 #include "drv_systick.h"
 
-/* 中断入口文件：
- * 1. 这里的函数名要和启动文件里的中断向量表一致
- * 2. 中断里只做最小必要工作，再把任务转交给驱动层或业务层
- * 3. 当前项目最关键的是 SysTick_Handler，它提供 1ms 系统节拍
- */
-
 /** @addtogroup STM32F10x_StdPeriph_Template
   * @{
   */
@@ -143,9 +137,6 @@ void PendSV_Handler(void)
   */
 void SysTick_Handler(void)
 {
-  /* 先更新毫秒节拍，再执行依赖 1ms 周期的轻量任务。 
-   * 这里暂时是维护全局计数器，无法实现断电走时，还需要更改。
-   */
   Drv_Systick_IrqHandler();
   App_Clock_Task1ms();
 }
