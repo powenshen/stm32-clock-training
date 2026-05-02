@@ -660,6 +660,16 @@
               <FilePath>.\bsp\board_config.h</FilePath>
             </File>
             <File>
+              <FileName>bsp_buzzer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\bsp\bsp_buzzer.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_buzzer.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\bsp\bsp_buzzer.h</FilePath>
+            </File>
+            <File>
               <FileName>bsp_led.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\bsp\bsp_led.c</FilePath>

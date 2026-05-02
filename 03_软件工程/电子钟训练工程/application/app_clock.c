@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 
+#include "bsp_buzzer.h"
 #include "bsp_lcd.h"
 #include "bsp_led.h"
 #include "bsp_touch.h"
@@ -231,11 +232,13 @@ static void App_Clock_ApplyLedState(void)
 
         led_mask = (g_clock.blink_state != 0U) ? BSP_LED_RED_MASK : 0U;
         BSP_LED_SetMask(led_mask);
+        BSP_Buzzer_SetState(g_clock.blink_state);
         return;
     }
 
     g_clock.blink_state = 0U;
     g_clock.last_blink_tick = Drv_Systick_Millis();
+    BSP_Buzzer_Off();
 
     if ((g_clock.view == APP_VIEW_SET_TIME_HOUR) ||
         (g_clock.view == APP_VIEW_SET_TIME_MINUTE) ||
@@ -395,6 +398,7 @@ static void App_Clock_StopAlarm(const char *reason)
     }
 
     g_clock.alarm_ringing = 0U;
+    BSP_Buzzer_Off();
     App_Clock_InvalidateUi();
     App_Clock_PrintState(reason);
 }
@@ -835,6 +839,7 @@ void App_Clock_Init(void)
     DrvRtcTime_t default_time;
 
     BSP_LED_Init();
+    BSP_Buzzer_Init();
     Drv_Key_Init();
     Drv_DebugUart_Init();
     Drv_Systick_Init();
@@ -854,6 +859,7 @@ void App_Clock_Init(void)
            BSP_LCD_GetScanMode(),
            BSP_LCD_GetWidth(),
            BSP_LCD_GetHeight());
+    Drv_DebugUart_SendString("Buzzer ready: PA8 gate control enabled.\n");
     Drv_DebugUart_SendString("Touch buttons ready: TIME / ON-OFF / STATE / ALARM\n");
     Drv_DebugUart_SendString("Edit buttons ready : NEXT / BACK / PLUS / MINUS\n");
     App_Clock_InvalidateUi();

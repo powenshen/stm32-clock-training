@@ -23,6 +23,12 @@
 #define BOARD_KEY_ACTIVE_LOW       1U
 #define BOARD_KEY_COUNT            2U
 
+#define BOARD_BUZZER_RCC           RCC_APB2Periph_GPIOA
+#define BOARD_BUZZER_PORT          GPIOA
+#define BOARD_BUZZER_PIN           GPIO_Pin_8
+/* PA8 polarity is still subject to on-board verification. */
+#define BOARD_BUZZER_ACTIVE_LOW    0U
+
 #define BOARD_DEBUG_UART_RCC       RCC_APB2Periph_USART1
 #define BOARD_DEBUG_GPIO_RCC       RCC_APB2Periph_GPIOA
 #define BOARD_DEBUG_UART           USART1
