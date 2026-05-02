@@ -5,9 +5,23 @@
 
 typedef enum
 {
-    KEY_EVENT_NONE = 0,
-    KEY_EVENT_CLICK,
-    KEY_EVENT_LONG_PRESS
+    KEY_ID_NONE = 0,
+    KEY_ID_KEY1,
+    KEY_ID_KEY2
+} KeyId_t;
+
+typedef enum
+{
+    KEY_EVENT_TYPE_NONE = 0,
+    KEY_EVENT_TYPE_CLICK,
+    KEY_EVENT_TYPE_LONG_PRESS,
+    KEY_EVENT_TYPE_REPEAT
+} KeyEventType_t;
+
+typedef struct
+{
+    KeyId_t key_id;
+    KeyEventType_t type;
 } KeyEvent_t;
 
 void Drv_Key_Init(void);
