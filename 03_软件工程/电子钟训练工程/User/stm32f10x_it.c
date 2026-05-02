@@ -131,10 +131,11 @@ void PendSV_Handler(void)
 }
 
 /**
-  * @brief  This function handles SysTick Handler.
-  * @param  None
-  * @retval None
-  */
+ * @brief  SysTick 中断服务函数
+ * 1. 该函数由 SysTick 中断触发执行
+ * 2. 在该函数中调用 Drv_Systick_IrqHandler() 来更新全局系统时间戳
+ * 3. 随后调用 App_Clock_Task1ms() 来执行中断时的任务，这里执行按键扫描相关的周期任务
+ */
 void SysTick_Handler(void)
 {
   Drv_Systick_IrqHandler();
