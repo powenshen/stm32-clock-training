@@ -669,6 +669,26 @@
               <FileType>5</FileType>
               <FilePath>.\bsp\bsp_led.h</FilePath>
             </File>
+            <File>
+              <FileName>bsp_lcd.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\bsp\bsp_lcd.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_lcd.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\bsp\bsp_lcd.h</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_touch.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\bsp\bsp_touch.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_touch.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\bsp\bsp_touch.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
