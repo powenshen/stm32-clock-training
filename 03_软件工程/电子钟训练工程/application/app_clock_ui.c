@@ -1,3 +1,7 @@
+/*
+ * LCD rendering and touch interaction for the clock application.
+ * This module is intentionally UI-focused and delegates all business rules to app_clock_core.c.
+ */
 #include "app_clock_ui.h"
 
 #include <stdio.h>
@@ -10,6 +14,9 @@
 #define APP_TOUCH_REPEAT_START_MS    400UL
 #define APP_TOUCH_REPEAT_PERIOD_MS   150UL
 
+/*
+ * Split the bottom tool area into four equal touch buttons.
+ */
 static void AppClockUi_GetButtonRect(AppTouchButtonId_t button_id,
                                      uint16_t *x,
                                      uint16_t *y,
@@ -38,6 +45,9 @@ static void AppClockUi_GetButtonRect(AppTouchButtonId_t button_id,
     *height = button_height;
 }
 
+/*
+ * Convert a screen point into one of the four logical touch buttons.
+ */
 static AppTouchButtonId_t AppClockUi_GetTouchButtonId(const BspTouchPoint_t *point)
 {
     AppTouchButtonId_t button_id;
@@ -65,6 +75,9 @@ static AppTouchButtonId_t AppClockUi_GetTouchButtonId(const BspTouchPoint_t *poi
     return APP_TOUCH_BUTTON_NONE;
 }
 
+/*
+ * Draw one logical tool button with a pressed-state inversion effect.
+ */
 static void AppClockUi_DrawTouchButton(AppTouchButtonId_t button_id,
                                        const char *label,
                                        uint16_t base_color,
@@ -103,7 +116,13 @@ void AppClockUi_Init(TouchUiState_t *touch_ui)
     touch_ui->last_repeat_tick = 0U;
 }
 
-void AppClockUi_HandleTouch(ClockContext_t *clock, TouchUiState_t *touch_ui, uint8_t *ui_dirty)
+/*
+ * Handle touch press/release transitions and translate them into logical clock actions.
+ */
+void AppClockUi_HandleTouch(ClockContext_t *clock,
+                            TouchUiState_t *touch_ui,
+                            uint8_t *ui_dirty,
+                            uint8_t *settings_dirty)
 {
     BspTouchPoint_t point;
     uint8_t is_pressed;
@@ -125,10 +144,11 @@ void AppClockUi_HandleTouch(ClockContext_t *clock, TouchUiState_t *touch_ui, uin
             touch_ui->last_repeat_tick = now_tick;
             *ui_dirty = 1U;
 
+            /* PLUS/MINUS should react immediately in edit mode. */
             if ((AppClockCore_IsEditView(clock->view) != 0U) &&
                 ((hit_button == APP_TOUCH_BUTTON_3) || (hit_button == APP_TOUCH_BUTTON_4)))
             {
-                AppClockCore_HandleTouchCommand(clock, hit_button, 1U, ui_dirty);
+                AppClockCore_HandleTouchCommand(clock, hit_button, 1U, ui_dirty, settings_dirty);
                 touch_ui->press_action_sent = 1U;
             }
         }
@@ -140,7 +160,7 @@ void AppClockUi_HandleTouch(ClockContext_t *clock, TouchUiState_t *touch_ui, uin
                 ((now_tick - touch_ui->last_repeat_tick) >= APP_TOUCH_REPEAT_PERIOD_MS))
             {
                 touch_ui->last_repeat_tick = now_tick;
-                AppClockCore_HandleTouchCommand(clock, hit_button, 1U, ui_dirty);
+                AppClockCore_HandleTouchCommand(clock, hit_button, 1U, ui_dirty, settings_dirty);
                 touch_ui->press_action_sent = 1U;
             }
         }
@@ -162,11 +182,14 @@ void AppClockUi_HandleTouch(ClockContext_t *clock, TouchUiState_t *touch_ui, uin
 
         if ((released_button != APP_TOUCH_BUTTON_NONE) && (send_release_action != 0U))
         {
-            AppClockCore_HandleTouchCommand(clock, released_button, 0U, ui_dirty);
+            AppClockCore_HandleTouchCommand(clock, released_button, 0U, ui_dirty, settings_dirty);
         }
     }
 }
 
+/*
+ * Render the current clock state to the LCD.
+ */
 void AppClockUi_Render(const ClockContext_t *clock,
                        const TouchUiState_t *touch_ui,
                        uint8_t *ui_dirty,
@@ -212,11 +235,13 @@ void AppClockUi_Render(const ClockContext_t *clock,
     }
     else if (clock->alarm_ringing != 0U)
     {
-        BSP_LCD_DrawString(16U, 184U, "TOUCH STOP", BSP_LCD_COLOR_RED, BSP_LCD_COLOR_BLACK, 2U);
+        sprintf(line_buffer, "STOP ALARM  MUTE %s", (clock->mute_enabled != 0U) ? "ON" : "OFF");
+        BSP_LCD_DrawString(16U, 184U, line_buffer, BSP_LCD_COLOR_RED, BSP_LCD_COLOR_BLACK, 2U);
     }
     else
     {
-        BSP_LCD_DrawString(16U, 184U, "PHYS KEY OK", BSP_LCD_COLOR_GRAY, BSP_LCD_COLOR_BLACK, 2U);
+        sprintf(line_buffer, "MUTE %s  PHYS+TOUCH+IR", (clock->mute_enabled != 0U) ? "ON" : "OFF");
+        BSP_LCD_DrawString(16U, 184U, line_buffer, BSP_LCD_COLOR_GRAY, BSP_LCD_COLOR_BLACK, 2U);
     }
 
     if (clock->alarm_ringing != 0U)

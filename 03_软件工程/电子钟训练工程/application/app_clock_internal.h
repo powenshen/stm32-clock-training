@@ -1,3 +1,7 @@
+/*
+ * Shared application-only data structures.
+ * Keep these types private to the clock application so external modules only see App_Clock_* entry points.
+ */
 #ifndef APP_CLOCK_INTERNAL_H
 #define APP_CLOCK_INTERNAL_H
 
@@ -31,6 +35,7 @@ typedef struct
     DrvRtcSource_t rtc_source;
     uint8_t alarm_enabled;
     uint8_t alarm_ringing;
+    uint8_t mute_enabled;
     uint32_t last_activity_tick;
     uint32_t alarm_start_tick;
     uint32_t last_alarm_second;

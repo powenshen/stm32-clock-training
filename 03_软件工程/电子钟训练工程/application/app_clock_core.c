@@ -1,3 +1,7 @@
+/*
+ * Core state machine for the STM32 electronic clock.
+ * Input sources such as keys, touch, and infrared should map into this module instead of duplicating rules.
+ */
 #include "app_clock_core.h"
 
 #include <stdio.h>
@@ -11,16 +15,33 @@
 #define APP_ALARM_RING_MS            30000UL
 #define APP_ALARM_BLINK_PERIOD_MS    200UL
 
+/*
+ * Mark the UI as dirty so the renderer refreshes on the next main-loop pass.
+ */
 static void AppClockCore_InvalidateUi(uint8_t *ui_dirty)
 {
     *ui_dirty = 1U;
 }
 
+/*
+ * Mark persistent parameters as dirty so the top-level task can save them once per loop.
+ */
+static void AppClockCore_InvalidateSettings(uint8_t *settings_dirty)
+{
+    *settings_dirty = 1U;
+}
+
+/*
+ * Refresh edit-activity time whenever the user changes an editable field.
+ */
 static void AppClockCore_RecordActivity(ClockContext_t *clock)
 {
     clock->last_activity_tick = Drv_Systick_Millis();
 }
 
+/*
+ * Enter time-edit mode and seed the editable copy from the current RTC time.
+ */
 static void AppClockCore_EnterTimeEdit(ClockContext_t *clock, uint8_t *ui_dirty)
 {
     Drv_Rtc_GetTime(&clock->edit_time);
@@ -30,6 +51,9 @@ static void AppClockCore_EnterTimeEdit(ClockContext_t *clock, uint8_t *ui_dirty)
     AppClockCore_PrintState(clock, "enter-time-edit");
 }
 
+/*
+ * Enter alarm-edit mode and seed the editable copy from the persistent alarm.
+ */
 static void AppClockCore_EnterAlarmEdit(ClockContext_t *clock, uint8_t *ui_dirty)
 {
     clock->edit_time = clock->alarm_time;
@@ -39,6 +63,9 @@ static void AppClockCore_EnterAlarmEdit(ClockContext_t *clock, uint8_t *ui_dirty
     AppClockCore_PrintState(clock, "enter-alarm-edit");
 }
 
+/*
+ * Exit any edit view without committing the pending value.
+ */
 static void AppClockCore_CancelEdit(ClockContext_t *clock, const char *reason, uint8_t *ui_dirty)
 {
     clock->view = APP_VIEW_RUN;
@@ -46,6 +73,9 @@ static void AppClockCore_CancelEdit(ClockContext_t *clock, const char *reason, u
     AppClockCore_PrintState(clock, reason);
 }
 
+/*
+ * Commit the edited wall-clock time into the RTC driver.
+ */
 static void AppClockCore_SaveTimeEdit(ClockContext_t *clock, uint8_t *ui_dirty)
 {
     Drv_Rtc_SetTime(&clock->edit_time);
@@ -54,16 +84,25 @@ static void AppClockCore_SaveTimeEdit(ClockContext_t *clock, uint8_t *ui_dirty)
     AppClockCore_PrintState(clock, "save-time");
 }
 
-static void AppClockCore_SaveAlarmEdit(ClockContext_t *clock, uint8_t *ui_dirty)
+/*
+ * Commit the edited alarm time and mark settings for persistence.
+ */
+static void AppClockCore_SaveAlarmEdit(ClockContext_t *clock,
+                                       uint8_t *ui_dirty,
+                                       uint8_t *settings_dirty)
 {
     clock->alarm_time = clock->edit_time;
     clock->alarm_time.second = 0U;
     clock->alarm_enabled = 1U;
     clock->view = APP_VIEW_RUN;
     AppClockCore_InvalidateUi(ui_dirty);
+    AppClockCore_InvalidateSettings(settings_dirty);
     AppClockCore_PrintState(clock, "save-alarm");
 }
 
+/*
+ * Change the currently edited field with wrap-around behavior.
+ */
 static void AppClockCore_AdjustEditValue(ClockContext_t *clock, int8_t delta, uint8_t *ui_dirty)
 {
     uint8_t *value;
@@ -104,6 +143,7 @@ static void AppClockCore_AdjustEditValue(ClockContext_t *clock, int8_t delta, ui
         *value = (uint8_t)((*value == 0U) ? (limit - 1U) : (*value - 1U));
     }
 
+    /* Alarm editing only keeps hour/minute precision. */
     if ((clock->view == APP_VIEW_SET_ALARM_HOUR) || (clock->view == APP_VIEW_SET_ALARM_MINUTE))
     {
         clock->edit_time.second = 0U;
@@ -114,7 +154,12 @@ static void AppClockCore_AdjustEditValue(ClockContext_t *clock, int8_t delta, ui
     AppClockCore_PrintState(clock, (delta > 0) ? "adjust++" : "adjust--");
 }
 
-static void AppClockCore_AdvanceEditView(ClockContext_t *clock, uint8_t *ui_dirty)
+/*
+ * Step through the current edit workflow. Time edit uses H/M/S, alarm edit uses H/M.
+ */
+static void AppClockCore_AdvanceEditView(ClockContext_t *clock,
+                                         uint8_t *ui_dirty,
+                                         uint8_t *settings_dirty)
 {
     switch (clock->view)
     {
@@ -135,7 +180,7 @@ static void AppClockCore_AdvanceEditView(ClockContext_t *clock, uint8_t *ui_dirt
             break;
 
         case APP_VIEW_SET_ALARM_MINUTE:
-            AppClockCore_SaveAlarmEdit(clock, ui_dirty);
+            AppClockCore_SaveAlarmEdit(clock, ui_dirty, settings_dirty);
             return;
 
         default:
@@ -147,6 +192,9 @@ static void AppClockCore_AdvanceEditView(ClockContext_t *clock, uint8_t *ui_dirt
     AppClockCore_PrintState(clock, "next-field");
 }
 
+/*
+ * Stop alarm output and return to normal indicator control.
+ */
 static void AppClockCore_StopAlarm(ClockContext_t *clock, const char *reason, uint8_t *ui_dirty)
 {
     if (clock->alarm_ringing == 0U)
@@ -160,6 +208,9 @@ static void AppClockCore_StopAlarm(ClockContext_t *clock, const char *reason, ui
     AppClockCore_PrintState(clock, reason);
 }
 
+/*
+ * Enter the ringing state when the alarm condition matches.
+ */
 static void AppClockCore_StartAlarm(ClockContext_t *clock, uint8_t *ui_dirty)
 {
     clock->alarm_ringing = 1U;
@@ -168,61 +219,6 @@ static void AppClockCore_StartAlarm(ClockContext_t *clock, uint8_t *ui_dirty)
     clock->blink_state = 1U;
     AppClockCore_InvalidateUi(ui_dirty);
     AppClockCore_PrintState(clock, "alarm-start");
-}
-
-static void AppClockCore_HandleRunKey(ClockContext_t *clock, const KeyEvent_t *event, uint8_t *ui_dirty)
-{
-    if ((event->key_id == KEY_ID_KEY1) && (event->type == KEY_EVENT_TYPE_CLICK))
-    {
-        AppClockCore_EnterTimeEdit(clock, ui_dirty);
-        return;
-    }
-
-    if ((event->key_id == KEY_ID_KEY1) && (event->type == KEY_EVENT_TYPE_LONG_PRESS))
-    {
-        clock->alarm_enabled = (uint8_t)!clock->alarm_enabled;
-        AppClockCore_InvalidateUi(ui_dirty);
-        AppClockCore_PrintState(clock, "alarm-toggle");
-        return;
-    }
-
-    if ((event->key_id == KEY_ID_KEY2) && (event->type == KEY_EVENT_TYPE_LONG_PRESS))
-    {
-        AppClockCore_EnterAlarmEdit(clock, ui_dirty);
-        return;
-    }
-
-    if ((event->key_id == KEY_ID_KEY2) && (event->type == KEY_EVENT_TYPE_CLICK))
-    {
-        AppClockCore_PrintState(clock, "run-click");
-    }
-}
-
-static void AppClockCore_HandleEditKey(ClockContext_t *clock, const KeyEvent_t *event, uint8_t *ui_dirty)
-{
-    if ((event->key_id == KEY_ID_KEY1) && (event->type == KEY_EVENT_TYPE_CLICK))
-    {
-        AppClockCore_AdvanceEditView(clock, ui_dirty);
-        return;
-    }
-
-    if ((event->key_id == KEY_ID_KEY1) && (event->type == KEY_EVENT_TYPE_LONG_PRESS))
-    {
-        AppClockCore_CancelEdit(clock, "cancel-edit", ui_dirty);
-        return;
-    }
-
-    if ((event->key_id == KEY_ID_KEY2) && (event->type == KEY_EVENT_TYPE_CLICK))
-    {
-        AppClockCore_AdjustEditValue(clock, 1, ui_dirty);
-        return;
-    }
-
-    if ((event->key_id == KEY_ID_KEY2) &&
-        ((event->type == KEY_EVENT_TYPE_LONG_PRESS) || (event->type == KEY_EVENT_TYPE_REPEAT)))
-    {
-        AppClockCore_AdjustEditValue(clock, -1, ui_dirty);
-    }
 }
 
 void AppClockCore_InitContext(ClockContext_t *clock)
@@ -237,6 +233,7 @@ void AppClockCore_InitContext(ClockContext_t *clock)
     clock->rtc_source = DRV_RTC_SOURCE_SOFTWARE;
     clock->alarm_enabled = 0U;
     clock->alarm_ringing = 0U;
+    clock->mute_enabled = 0U;
     clock->last_activity_tick = 0U;
     clock->alarm_start_tick = 0U;
     clock->last_alarm_second = 0xFFFFFFFFUL;
@@ -364,7 +361,7 @@ void AppClockCore_PrintState(const ClockContext_t *clock, const char *reason)
 
     Drv_Rtc_GetTime(&now);
 
-    printf("[%s] now=%02u:%02u:%02u view=%s alarm=%s %02u:%02u ring=%u edit=%02u:%02u:%02u\n",
+    printf("[%s] now=%02u:%02u:%02u view=%s alarm=%s %02u:%02u ring=%u mute=%u edit=%02u:%02u:%02u\n",
            reason,
            now.hour,
            now.minute,
@@ -374,12 +371,38 @@ void AppClockCore_PrintState(const ClockContext_t *clock, const char *reason)
            clock->alarm_time.hour,
            clock->alarm_time.minute,
            clock->alarm_ringing,
+           clock->mute_enabled,
            clock->edit_time.hour,
            clock->edit_time.minute,
            clock->edit_time.second);
 }
 
-void AppClockCore_HandleKeyEvent(ClockContext_t *clock, KeyEvent_t event, uint8_t *ui_dirty)
+void AppClockCore_ToggleAlarmEnable(ClockContext_t *clock,
+                                    uint8_t *ui_dirty,
+                                    uint8_t *settings_dirty,
+                                    const char *reason)
+{
+    clock->alarm_enabled = (uint8_t)!clock->alarm_enabled;
+    AppClockCore_InvalidateUi(ui_dirty);
+    AppClockCore_InvalidateSettings(settings_dirty);
+    AppClockCore_PrintState(clock, reason);
+}
+
+void AppClockCore_ToggleMute(ClockContext_t *clock,
+                             uint8_t *ui_dirty,
+                             uint8_t *settings_dirty,
+                             const char *reason)
+{
+    clock->mute_enabled = (uint8_t)!clock->mute_enabled;
+    AppClockCore_InvalidateUi(ui_dirty);
+    AppClockCore_InvalidateSettings(settings_dirty);
+    AppClockCore_PrintState(clock, reason);
+}
+
+void AppClockCore_HandleKeyEvent(ClockContext_t *clock,
+                                 KeyEvent_t event,
+                                 uint8_t *ui_dirty,
+                                 uint8_t *settings_dirty)
 {
     if (event.type == KEY_EVENT_TYPE_NONE)
     {
@@ -394,18 +417,61 @@ void AppClockCore_HandleKeyEvent(ClockContext_t *clock, KeyEvent_t event, uint8_
 
     if (AppClockCore_IsEditView(clock->view) != 0U)
     {
-        AppClockCore_HandleEditKey(clock, &event, ui_dirty);
+        if ((event.key_id == KEY_ID_KEY1) && (event.type == KEY_EVENT_TYPE_CLICK))
+        {
+            AppClockCore_AdvanceEditView(clock, ui_dirty, settings_dirty);
+            return;
+        }
+
+        if ((event.key_id == KEY_ID_KEY1) && (event.type == KEY_EVENT_TYPE_LONG_PRESS))
+        {
+            AppClockCore_CancelEdit(clock, "cancel-edit", ui_dirty);
+            return;
+        }
+
+        if ((event.key_id == KEY_ID_KEY2) && (event.type == KEY_EVENT_TYPE_CLICK))
+        {
+            AppClockCore_AdjustEditValue(clock, 1, ui_dirty);
+            return;
+        }
+
+        if ((event.key_id == KEY_ID_KEY2) &&
+            ((event.type == KEY_EVENT_TYPE_LONG_PRESS) || (event.type == KEY_EVENT_TYPE_REPEAT)))
+        {
+            AppClockCore_AdjustEditValue(clock, -1, ui_dirty);
+        }
+        return;
     }
-    else
+
+    if ((event.key_id == KEY_ID_KEY1) && (event.type == KEY_EVENT_TYPE_CLICK))
     {
-        AppClockCore_HandleRunKey(clock, &event, ui_dirty);
+        AppClockCore_EnterTimeEdit(clock, ui_dirty);
+        return;
+    }
+
+    if ((event.key_id == KEY_ID_KEY1) && (event.type == KEY_EVENT_TYPE_LONG_PRESS))
+    {
+        AppClockCore_ToggleAlarmEnable(clock, ui_dirty, settings_dirty, "alarm-toggle");
+        return;
+    }
+
+    if ((event.key_id == KEY_ID_KEY2) && (event.type == KEY_EVENT_TYPE_LONG_PRESS))
+    {
+        AppClockCore_EnterAlarmEdit(clock, ui_dirty);
+        return;
+    }
+
+    if ((event.key_id == KEY_ID_KEY2) && (event.type == KEY_EVENT_TYPE_CLICK))
+    {
+        AppClockCore_PrintState(clock, "run-click");
     }
 }
 
 void AppClockCore_HandleTouchCommand(ClockContext_t *clock,
                                      AppTouchButtonId_t button_id,
                                      uint8_t is_hold_action,
-                                     uint8_t *ui_dirty)
+                                     uint8_t *ui_dirty,
+                                     uint8_t *settings_dirty)
 {
     if (clock->alarm_ringing != 0U)
     {
@@ -430,7 +496,7 @@ void AppClockCore_HandleTouchCommand(ClockContext_t *clock,
 
         if (button_id == APP_TOUCH_BUTTON_1)
         {
-            AppClockCore_AdvanceEditView(clock, ui_dirty);
+            AppClockCore_AdvanceEditView(clock, ui_dirty, settings_dirty);
         }
         else if (button_id == APP_TOUCH_BUTTON_2)
         {
@@ -451,9 +517,7 @@ void AppClockCore_HandleTouchCommand(ClockContext_t *clock,
             break;
 
         case APP_TOUCH_BUTTON_2:
-            clock->alarm_enabled = (uint8_t)!clock->alarm_enabled;
-            AppClockCore_InvalidateUi(ui_dirty);
-            AppClockCore_PrintState(clock, "touch-alarm-toggle");
+            AppClockCore_ToggleAlarmEnable(clock, ui_dirty, settings_dirty, "touch-alarm-toggle");
             break;
 
         case APP_TOUCH_BUTTON_3:
@@ -532,7 +596,7 @@ void AppClockCore_UpdateIndicators(ClockContext_t *clock, uint8_t *ui_dirty)
 
         led_mask = (clock->blink_state != 0U) ? BSP_LED_RED_MASK : 0U;
         BSP_LED_SetMask(led_mask);
-        BSP_Buzzer_SetState(clock->blink_state);
+        BSP_Buzzer_SetState((uint8_t)((clock->blink_state != 0U) && (clock->mute_enabled == 0U)));
         return;
     }
 

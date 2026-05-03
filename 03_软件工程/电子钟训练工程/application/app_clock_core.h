@@ -1,3 +1,7 @@
+/*
+ * Core clock business logic.
+ * This module owns mode transitions, alarm rules, indicator state, and source-independent user actions.
+ */
 #ifndef APP_CLOCK_CORE_H
 #define APP_CLOCK_CORE_H
 
@@ -15,13 +19,25 @@ const char *AppClockCore_ModeLabel(const ClockContext_t *clock);
 const char *AppClockCore_EditFieldLabel(const ClockContext_t *clock);
 
 void AppClockCore_PrintState(const ClockContext_t *clock, const char *reason);
-void AppClockCore_HandleKeyEvent(ClockContext_t *clock, KeyEvent_t event, uint8_t *ui_dirty);
+void AppClockCore_HandleKeyEvent(ClockContext_t *clock,
+                                 KeyEvent_t event,
+                                 uint8_t *ui_dirty,
+                                 uint8_t *settings_dirty);
 void AppClockCore_HandleTouchCommand(ClockContext_t *clock,
                                      AppTouchButtonId_t button_id,
                                      uint8_t is_hold_action,
-                                     uint8_t *ui_dirty);
+                                     uint8_t *ui_dirty,
+                                     uint8_t *settings_dirty);
 void AppClockCore_CheckEditTimeout(ClockContext_t *clock, uint8_t *ui_dirty);
 void AppClockCore_CheckAlarm(ClockContext_t *clock, const DrvRtcTime_t *now, uint8_t *ui_dirty);
 void AppClockCore_UpdateIndicators(ClockContext_t *clock, uint8_t *ui_dirty);
+void AppClockCore_ToggleAlarmEnable(ClockContext_t *clock,
+                                    uint8_t *ui_dirty,
+                                    uint8_t *settings_dirty,
+                                    const char *reason);
+void AppClockCore_ToggleMute(ClockContext_t *clock,
+                             uint8_t *ui_dirty,
+                             uint8_t *settings_dirty,
+                             const char *reason);
 
 #endif
