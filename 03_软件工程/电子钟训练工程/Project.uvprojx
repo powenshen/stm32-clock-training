@@ -759,6 +759,31 @@
               <FileType>5</FileType>
               <FilePath>.\application\app_clock.h</FilePath>
             </File>
+            <File>
+              <FileName>app_clock_internal.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\application\app_clock_internal.h</FilePath>
+            </File>
+            <File>
+              <FileName>app_clock_core.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\application\app_clock_core.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_clock_core.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\application\app_clock_core.h</FilePath>
+            </File>
+            <File>
+              <FileName>app_clock_ui.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\application\app_clock_ui.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_clock_ui.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\application\app_clock_ui.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
