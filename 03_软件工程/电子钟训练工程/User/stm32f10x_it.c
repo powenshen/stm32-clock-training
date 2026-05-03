@@ -25,6 +25,7 @@
 #include "stm32f10x_it.h"
 
 #include "app_clock.h"
+#include "drv_ir_remote.h"
 #include "drv_systick.h"
 
 /** @addtogroup STM32F10x_StdPeriph_Template
@@ -132,14 +133,19 @@ void PendSV_Handler(void)
 
 /**
  * @brief  SysTick 中断服务函数
- * 1. 该函数由 SysTick 中断触发执行
- * 2. 在该函数中调用 Drv_Systick_IrqHandler() 来更新全局系统时间戳
- * 3. 随后调用 App_Clock_Task1ms() 来执行中断时的任务，这里执行按键扫描相关的周期任务
+ * 1. 由 SysTick 中断触发执行
+ * 2. 调用 Drv_Systick_IrqHandler() 来更新全局系统时间戳
+ * 3. 随后调用 App_Clock_Task1ms() 来执行中断时的任务
  */
 void SysTick_Handler(void)
 {
   Drv_Systick_IrqHandler();
   App_Clock_Task1ms();
+}
+
+void EXTI9_5_IRQHandler(void)
+{
+  Drv_IrRemote_IrqHandler();
 }
 
 /******************************************************************************/

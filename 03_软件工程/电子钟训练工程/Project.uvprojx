@@ -744,6 +744,26 @@
               <FileType>5</FileType>
               <FilePath>.\drivers\drv_rtc.h</FilePath>
             </File>
+            <File>
+              <FileName>drv_backup.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\drivers\drv_backup.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_backup.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\drivers\drv_backup.h</FilePath>
+            </File>
+            <File>
+              <FileName>drv_ir_remote.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\drivers\drv_ir_remote.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_ir_remote.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\drivers\drv_ir_remote.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -758,6 +778,51 @@
               <FileName>app_clock.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\application\app_clock.h</FilePath>
+            </File>
+            <File>
+              <FileName>app_clock_internal.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\application\app_clock_internal.h</FilePath>
+            </File>
+            <File>
+              <FileName>app_clock_core.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\application\app_clock_core.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_clock_core.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\application\app_clock_core.h</FilePath>
+            </File>
+            <File>
+              <FileName>app_clock_ui.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\application\app_clock_ui.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_clock_ui.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\application\app_clock_ui.h</FilePath>
+            </File>
+            <File>
+              <FileName>app_clock_storage.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\application\app_clock_storage.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_clock_storage.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\application\app_clock_storage.h</FilePath>
+            </File>
+            <File>
+              <FileName>app_clock_remote.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\application\app_clock_remote.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_clock_remote.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\application\app_clock_remote.h</FilePath>
             </File>
           </Files>
         </Group>
