@@ -5,9 +5,9 @@
 
 typedef struct
 {
-    uint8_t hour;
-    uint8_t minute;
-    uint8_t second;
+    uint8_t hour;    /* 小时，范围 0~23 */
+    uint8_t minute;  /* 分钟，范围 0~59 */
+    uint8_t second;  /* 秒，范围 0~59 */
 } DrvRtcTime_t;
 
 typedef enum

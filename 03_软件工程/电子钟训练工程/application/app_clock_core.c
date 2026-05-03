@@ -15,32 +15,41 @@
 #define APP_ALARM_RING_MS            30000UL
 #define APP_ALARM_BLINK_PERIOD_MS    200UL
 
-/*
- * Mark the UI as dirty so the renderer refreshes on the next main-loop pass.
+/**
+ * @brief  置位界面脏标志，通知主循环刷新 LCD
+ * @param  ui_dirty: UI 刷新标志指针
+ * @retval 无
  */
 static void AppClockCore_InvalidateUi(uint8_t *ui_dirty)
 {
     *ui_dirty = 1U;
 }
 
-/*
- * Mark persistent parameters as dirty so the top-level task can save them once per loop.
+/**
+ * @brief  置位参数脏标志，通知主循环执行一次保存
+ * @param  settings_dirty: 参数保存标志指针
+ * @retval 无
  */
 static void AppClockCore_InvalidateSettings(uint8_t *settings_dirty)
 {
     *settings_dirty = 1U;
 }
 
-/*
- * Refresh edit-activity time whenever the user changes an editable field.
+/**
+ * @brief  记录最近一次编辑活动时间
+ * @param  clock: 电子钟状态对象指针
+ * @retval 无
  */
 static void AppClockCore_RecordActivity(ClockContext_t *clock)
 {
     clock->last_activity_tick = Drv_Systick_Millis();
 }
 
-/*
- * Enter time-edit mode and seed the editable copy from the current RTC time.
+/**
+ * @brief  进入改时模式并装载当前 RTC 时间
+ * @param  clock: 电子钟状态对象指针
+ * @param  ui_dirty: UI 刷新标志指针
+ * @retval 无
  */
 static void AppClockCore_EnterTimeEdit(ClockContext_t *clock, uint8_t *ui_dirty)
 {
@@ -51,8 +60,11 @@ static void AppClockCore_EnterTimeEdit(ClockContext_t *clock, uint8_t *ui_dirty)
     AppClockCore_PrintState(clock, "enter-time-edit");
 }
 
-/*
- * Enter alarm-edit mode and seed the editable copy from the persistent alarm.
+/**
+ * @brief  进入闹钟设置模式并装载当前闹钟时间
+ * @param  clock: 电子钟状态对象指针
+ * @param  ui_dirty: UI 刷新标志指针
+ * @retval 无
  */
 static void AppClockCore_EnterAlarmEdit(ClockContext_t *clock, uint8_t *ui_dirty)
 {
@@ -63,8 +75,12 @@ static void AppClockCore_EnterAlarmEdit(ClockContext_t *clock, uint8_t *ui_dirty
     AppClockCore_PrintState(clock, "enter-alarm-edit");
 }
 
-/*
- * Exit any edit view without committing the pending value.
+/**
+ * @brief  取消当前编辑并返回运行界面
+ * @param  clock: 电子钟状态对象指针
+ * @param  reason: 调试输出原因字符串
+ * @param  ui_dirty: UI 刷新标志指针
+ * @retval 无
  */
 static void AppClockCore_CancelEdit(ClockContext_t *clock, const char *reason, uint8_t *ui_dirty)
 {
@@ -73,8 +89,11 @@ static void AppClockCore_CancelEdit(ClockContext_t *clock, const char *reason, u
     AppClockCore_PrintState(clock, reason);
 }
 
-/*
- * Commit the edited wall-clock time into the RTC driver.
+/**
+ * @brief  保存编辑后的当前时间到 RTC 驱动
+ * @param  clock: 电子钟状态对象指针
+ * @param  ui_dirty: UI 刷新标志指针
+ * @retval 无
  */
 static void AppClockCore_SaveTimeEdit(ClockContext_t *clock, uint8_t *ui_dirty)
 {
@@ -84,8 +103,12 @@ static void AppClockCore_SaveTimeEdit(ClockContext_t *clock, uint8_t *ui_dirty)
     AppClockCore_PrintState(clock, "save-time");
 }
 
-/*
- * Commit the edited alarm time and mark settings for persistence.
+/**
+ * @brief  保存编辑后的闹钟时间并标记参数待持久化
+ * @param  clock: 电子钟状态对象指针
+ * @param  ui_dirty: UI 刷新标志指针
+ * @param  settings_dirty: 参数保存标志指针
+ * @retval 无
  */
 static void AppClockCore_SaveAlarmEdit(ClockContext_t *clock,
                                        uint8_t *ui_dirty,
@@ -100,13 +123,17 @@ static void AppClockCore_SaveAlarmEdit(ClockContext_t *clock,
     AppClockCore_PrintState(clock, "save-alarm");
 }
 
-/*
- * Change the currently edited field with wrap-around behavior.
+/**
+ * @brief  调整当前编辑字段的值，超出范围时回绕
+ * @param  clock: 电子钟状态对象指针
+ * @param  delta: 调整方向，正数加一，负数减一
+ * @param  ui_dirty: UI 刷新标志指针
+ * @retval 无
  */
 static void AppClockCore_AdjustEditValue(ClockContext_t *clock, int8_t delta, uint8_t *ui_dirty)
 {
-    uint8_t *value;
-    uint8_t limit;
+    uint8_t *value;  /* 当前被编辑字段的值指针 */
+    uint8_t limit;   /* 当前字段的取值上限 */
 
     value = 0;
     limit = 0U;
@@ -154,8 +181,12 @@ static void AppClockCore_AdjustEditValue(ClockContext_t *clock, int8_t delta, ui
     AppClockCore_PrintState(clock, (delta > 0) ? "adjust++" : "adjust--");
 }
 
-/*
- * Step through the current edit workflow. Time edit uses H/M/S, alarm edit uses H/M.
+/**
+ * @brief  推进当前编辑流程，改时依次编辑时分秒，闹钟依次编辑时分
+ * @param  clock: 电子钟状态对象指针
+ * @param  ui_dirty: UI 刷新标志指针
+ * @param  settings_dirty: 参数保存标志指针
+ * @retval 无
  */
 static void AppClockCore_AdvanceEditView(ClockContext_t *clock,
                                          uint8_t *ui_dirty,
@@ -192,8 +223,12 @@ static void AppClockCore_AdvanceEditView(ClockContext_t *clock,
     AppClockCore_PrintState(clock, "next-field");
 }
 
-/*
- * Stop alarm output and return to normal indicator control.
+/**
+ * @brief  停止闹钟输出并返回正常指示状态
+ * @param  clock: 电子钟状态对象指针
+ * @param  reason: 调试输出原因字符串
+ * @param  ui_dirty: UI 刷新标志指针
+ * @retval 无
  */
 static void AppClockCore_StopAlarm(ClockContext_t *clock, const char *reason, uint8_t *ui_dirty)
 {
@@ -208,8 +243,11 @@ static void AppClockCore_StopAlarm(ClockContext_t *clock, const char *reason, ui
     AppClockCore_PrintState(clock, reason);
 }
 
-/*
- * Enter the ringing state when the alarm condition matches.
+/**
+ * @brief  进入闹钟响铃状态
+ * @param  clock: 电子钟状态对象指针
+ * @param  ui_dirty: UI 刷新标志指针
+ * @retval 无
  */
 static void AppClockCore_StartAlarm(ClockContext_t *clock, uint8_t *ui_dirty)
 {
@@ -221,6 +259,11 @@ static void AppClockCore_StartAlarm(ClockContext_t *clock, uint8_t *ui_dirty)
     AppClockCore_PrintState(clock, "alarm-start");
 }
 
+/**
+ * @brief  初始化电子钟核心状态
+ * @param  clock: 电子钟状态对象指针
+ * @retval 无
+ */
 void AppClockCore_InitContext(ClockContext_t *clock)
 {
     clock->alarm_time.hour = 6U;
@@ -241,11 +284,21 @@ void AppClockCore_InitContext(ClockContext_t *clock)
     clock->blink_state = 0U;
 }
 
+/**
+ * @brief  判断当前视图是否属于编辑态
+ * @param  view: 当前应用视图
+ * @retval 1 表示编辑态，0 表示运行态
+ */
 uint8_t AppClockCore_IsEditView(AppView_t view)
 {
     return (uint8_t)(view != APP_VIEW_RUN);
 }
 
+/**
+ * @brief  将时分秒结构转换为当天秒数
+ * @param  time: 时间结构指针
+ * @retval 对应的秒数
+ */
 uint32_t AppClockCore_TimeToSeconds(const DrvRtcTime_t *time)
 {
     return (((uint32_t)time->hour * 3600UL) +
@@ -253,6 +306,11 @@ uint32_t AppClockCore_TimeToSeconds(const DrvRtcTime_t *time)
             (uint32_t)time->second);
 }
 
+/**
+ * @brief  获取视图枚举对应的调试名称
+ * @param  view: 当前应用视图
+ * @retval 视图名称字符串
+ */
 const char *AppClockCore_ViewName(AppView_t view)
 {
     switch (view)
@@ -280,6 +338,11 @@ const char *AppClockCore_ViewName(AppView_t view)
     }
 }
 
+/**
+ * @brief  获取 RTC 来源对应的详细名称
+ * @param  source: RTC 来源枚举
+ * @retval RTC 来源名称字符串
+ */
 const char *AppClockCore_RtcSourceName(DrvRtcSource_t source)
 {
     switch (source)
@@ -296,6 +359,11 @@ const char *AppClockCore_RtcSourceName(DrvRtcSource_t source)
     }
 }
 
+/**
+ * @brief  获取 RTC 来源对应的短标签
+ * @param  source: RTC 来源枚举
+ * @retval RTC 来源短标签字符串
+ */
 const char *AppClockCore_RtcSourceLabel(DrvRtcSource_t source)
 {
     switch (source)
@@ -312,6 +380,11 @@ const char *AppClockCore_RtcSourceLabel(DrvRtcSource_t source)
     }
 }
 
+/**
+ * @brief  获取当前模式显示文本
+ * @param  clock: 电子钟状态对象指针
+ * @retval 模式文本字符串
+ */
 const char *AppClockCore_ModeLabel(const ClockContext_t *clock)
 {
     switch (clock->view)
@@ -335,6 +408,11 @@ const char *AppClockCore_ModeLabel(const ClockContext_t *clock)
     }
 }
 
+/**
+ * @brief  获取当前编辑字段名称
+ * @param  clock: 电子钟状态对象指针
+ * @retval 编辑字段文本字符串
+ */
 const char *AppClockCore_EditFieldLabel(const ClockContext_t *clock)
 {
     switch (clock->view)
@@ -355,9 +433,15 @@ const char *AppClockCore_EditFieldLabel(const ClockContext_t *clock)
     }
 }
 
+/**
+ * @brief  打印当前电子钟状态到调试串口
+ * @param  clock: 电子钟状态对象指针
+ * @param  reason: 状态打印原因字符串
+ * @retval 无
+ */
 void AppClockCore_PrintState(const ClockContext_t *clock, const char *reason)
 {
-    DrvRtcTime_t now;
+    DrvRtcTime_t now;  /* 当前 RTC 时间快照 */
 
     Drv_Rtc_GetTime(&now);
 
@@ -377,6 +461,14 @@ void AppClockCore_PrintState(const ClockContext_t *clock, const char *reason)
            clock->edit_time.second);
 }
 
+/**
+ * @brief  切换闹钟使能状态
+ * @param  clock: 电子钟状态对象指针
+ * @param  ui_dirty: UI 刷新标志指针
+ * @param  settings_dirty: 参数保存标志指针
+ * @param  reason: 调试输出原因字符串
+ * @retval 无
+ */
 void AppClockCore_ToggleAlarmEnable(ClockContext_t *clock,
                                     uint8_t *ui_dirty,
                                     uint8_t *settings_dirty,
@@ -388,6 +480,14 @@ void AppClockCore_ToggleAlarmEnable(ClockContext_t *clock,
     AppClockCore_PrintState(clock, reason);
 }
 
+/**
+ * @brief  切换静音状态
+ * @param  clock: 电子钟状态对象指针
+ * @param  ui_dirty: UI 刷新标志指针
+ * @param  settings_dirty: 参数保存标志指针
+ * @param  reason: 调试输出原因字符串
+ * @retval 无
+ */
 void AppClockCore_ToggleMute(ClockContext_t *clock,
                              uint8_t *ui_dirty,
                              uint8_t *settings_dirty,
@@ -399,6 +499,14 @@ void AppClockCore_ToggleMute(ClockContext_t *clock,
     AppClockCore_PrintState(clock, reason);
 }
 
+/**
+ * @brief  处理物理按键事件并更新核心状态
+ * @param  clock: 电子钟状态对象指针
+ * @param  event: 按键事件
+ * @param  ui_dirty: UI 刷新标志指针
+ * @param  settings_dirty: 参数保存标志指针
+ * @retval 无
+ */
 void AppClockCore_HandleKeyEvent(ClockContext_t *clock,
                                  KeyEvent_t event,
                                  uint8_t *ui_dirty,
@@ -467,6 +575,15 @@ void AppClockCore_HandleKeyEvent(ClockContext_t *clock,
     }
 }
 
+/**
+ * @brief  处理逻辑触摸按键命令
+ * @param  clock: 电子钟状态对象指针
+ * @param  button_id: 逻辑按钮编号
+ * @param  is_hold_action: 是否为长按连发动作
+ * @param  ui_dirty: UI 刷新标志指针
+ * @param  settings_dirty: 参数保存标志指针
+ * @retval 无
+ */
 void AppClockCore_HandleTouchCommand(ClockContext_t *clock,
                                      AppTouchButtonId_t button_id,
                                      uint8_t is_hold_action,
@@ -533,9 +650,15 @@ void AppClockCore_HandleTouchCommand(ClockContext_t *clock,
     }
 }
 
+/**
+ * @brief  检查编辑态是否超时退出
+ * @param  clock: 电子钟状态对象指针
+ * @param  ui_dirty: UI 刷新标志指针
+ * @retval 无
+ */
 void AppClockCore_CheckEditTimeout(ClockContext_t *clock, uint8_t *ui_dirty)
 {
-    uint32_t now_tick;
+    uint32_t now_tick;  /* 当前系统毫秒计数 */
 
     if (AppClockCore_IsEditView(clock->view) == 0U)
     {
@@ -549,9 +672,16 @@ void AppClockCore_CheckEditTimeout(ClockContext_t *clock, uint8_t *ui_dirty)
     }
 }
 
+/**
+ * @brief  检查是否满足闹钟触发条件
+ * @param  clock: 电子钟状态对象指针
+ * @param  now: 当前时间指针
+ * @param  ui_dirty: UI 刷新标志指针
+ * @retval 无
+ */
 void AppClockCore_CheckAlarm(ClockContext_t *clock, const DrvRtcTime_t *now, uint8_t *ui_dirty)
 {
-    uint32_t now_seconds;
+    uint32_t now_seconds;  /* 当前时间对应的当天秒数 */
 
     if (clock->alarm_ringing != 0U)
     {
@@ -582,9 +712,15 @@ void AppClockCore_CheckAlarm(ClockContext_t *clock, const DrvRtcTime_t *now, uin
     }
 }
 
+/**
+ * @brief  根据当前状态更新 LED 与蜂鸣器输出
+ * @param  clock: 电子钟状态对象指针
+ * @param  ui_dirty: UI 刷新标志指针
+ * @retval 无
+ */
 void AppClockCore_UpdateIndicators(ClockContext_t *clock, uint8_t *ui_dirty)
 {
-    uint8_t led_mask;
+    uint8_t led_mask;  /* 当前准备输出的 LED 颜色掩码 */
 
     if (clock->alarm_ringing != 0U)
     {

@@ -4,10 +4,15 @@
 
 #include "board_config.h"
 
+/**
+ * @brief  初始化调试串口
+ * @param  无
+ * @retval 无
+ */
 void Drv_DebugUart_Init(void)
 {
-    GPIO_InitTypeDef gpio_init_structure;
-    USART_InitTypeDef usart_init_structure;
+    GPIO_InitTypeDef gpio_init_structure;    /* 调试串口 GPIO 初始化参数 */
+    USART_InitTypeDef usart_init_structure;  /* 调试串口外设初始化参数 */
 
     RCC_APB2PeriphClockCmd(BOARD_DEBUG_GPIO_RCC | BOARD_DEBUG_UART_RCC, ENABLE);
 
@@ -31,6 +36,11 @@ void Drv_DebugUart_Init(void)
     USART_Cmd(BOARD_DEBUG_UART, ENABLE);
 }
 
+/**
+ * @brief  通过调试串口发送单个字符
+ * @param  ch: 待发送字符
+ * @retval 无
+ */
 void Drv_DebugUart_SendChar(char ch)
 {
     USART_SendData(BOARD_DEBUG_UART, (uint16_t)ch);
@@ -39,6 +49,11 @@ void Drv_DebugUart_SendChar(char ch)
     }
 }
 
+/**
+ * @brief  通过调试串口发送字符串
+ * @param  text: 待发送字符串指针
+ * @retval 无
+ */
 void Drv_DebugUart_SendString(const char *text)
 {
     while (*text != '\0')
@@ -54,11 +69,17 @@ void Drv_DebugUart_SendString(const char *text)
 
 struct __FILE
 {
-    int handle;
+    int handle;  /* 标准流句柄占位字段 */
 };
 
-FILE __stdout;
+FILE __stdout;  /* printf 重定向使用的标准输出流对象 */
 
+/**
+ * @brief  重定向 printf 输出到调试串口
+ * @param  ch: 待输出字符
+ * @param  stream: 标准流对象
+ * @retval 输出后的字符值
+ */
 int fputc(int ch, FILE *stream)
 {
     (void)stream;

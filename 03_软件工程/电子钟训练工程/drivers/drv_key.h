@@ -20,8 +20,8 @@ typedef enum
 
 typedef struct
 {
-    KeyId_t key_id;
-    KeyEventType_t type;
+    KeyId_t key_id;         /* 产生事件的按键编号 */
+    KeyEventType_t type;    /* 产生的按键事件类型 */
 } KeyEvent_t;
 
 void Drv_Key_Init(void);

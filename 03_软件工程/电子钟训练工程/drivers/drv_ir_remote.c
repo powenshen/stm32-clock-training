@@ -23,19 +23,26 @@
 
 typedef struct
 {
-    uint8_t edge_seen;
-    uint8_t receiving;
-    uint8_t bit_index;
-    uint8_t has_last_frame;
-    uint32_t last_edge_tick;
-    uint32_t frame_data;
-    uint16_t last_address;
-    uint8_t last_command;
+    uint8_t edge_seen;         /* 是否已经捕获到第一条下降沿 */
+    uint8_t receiving;         /* 当前是否处于接收一帧数据状态 */
+    uint8_t bit_index;         /* 当前已接收的位索引 */
+    uint8_t has_last_frame;    /* 是否保存了上一条合法命令帧 */
+    uint32_t last_edge_tick;   /* 上一次下降沿时间戳 */
+    uint32_t frame_data;       /* 正在组装的 32 位 NEC 原始帧 */
+    uint16_t last_address;     /* 上一条合法帧的地址码 */
+    uint8_t last_command;      /* 上一条合法帧的命令码 */
 } DrvIrRuntime_t;
 
-static volatile DrvIrRemoteEvent_t g_ir_event = {0U, 0U, DRV_IR_REMOTE_EVENT_NONE};
-static DrvIrRuntime_t g_ir_runtime = {0U, 0U, 0U, 0U, 0UL, 0UL, 0U, 0U};
+static volatile DrvIrRemoteEvent_t g_ir_event = {0U, 0U, DRV_IR_REMOTE_EVENT_NONE};  /* 待主循环读取的红外事件缓存 */
+static DrvIrRuntime_t g_ir_runtime = {0U, 0U, 0U, 0U, 0UL, 0UL, 0U, 0U};             /* 红外协议解析运行时状态 */
 
+/**
+ * @brief  向事件缓存压入一条红外事件
+ * @param  address: 红外地址码
+ * @param  command: 红外命令码
+ * @param  type: 事件类型
+ * @retval 无
+ */
 static void Drv_IrRemote_PushEvent(uint16_t address, uint8_t command, DrvIrRemoteEventType_t type)
 {
     if (g_ir_event.type != DRV_IR_REMOTE_EVENT_NONE)
@@ -48,6 +55,11 @@ static void Drv_IrRemote_PushEvent(uint16_t address, uint8_t command, DrvIrRemot
     g_ir_event.type = type;
 }
 
+/**
+ * @brief  复位当前红外帧解析状态
+ * @param  无
+ * @retval 无
+ */
 static void Drv_IrRemote_ResetFrame(void)
 {
     g_ir_runtime.receiving = 0U;
@@ -55,17 +67,31 @@ static void Drv_IrRemote_ResetFrame(void)
     g_ir_runtime.frame_data = 0UL;
 }
 
+/**
+ * @brief  判断数值是否落在指定区间内
+ * @param  value: 待判断值
+ * @param  min_value: 区间最小值
+ * @param  max_value: 区间最大值
+ * @retval 1 表示在区间内，0 表示不在区间内
+ */
 static uint8_t Drv_IrRemote_IsInRange(uint32_t value, uint32_t min_value, uint32_t max_value)
 {
     return (uint8_t)((value >= min_value) && (value <= max_value));
 }
 
+/**
+ * @brief  对解析完成的 NEC 原始帧做合法性检查并提取命令
+ * @param  frame_data: 32 位原始帧数据
+ * @param  address: 输出地址码指针
+ * @param  command: 输出命令码指针
+ * @retval 1 表示帧合法，0 表示帧非法
+ */
 static uint8_t Drv_IrRemote_FinalizeFrame(uint32_t frame_data, uint16_t *address, uint8_t *command)
 {
-    uint8_t address_low;
-    uint8_t address_high;
-    uint8_t command_value;
-    uint8_t command_inverse;
+    uint8_t address_low;      /* 地址码低字节 */
+    uint8_t address_high;     /* 地址码高字节或反码 */
+    uint8_t command_value;    /* 命令码 */
+    uint8_t command_inverse;  /* 命令码反码 */
 
     address_low = (uint8_t)(frame_data & 0xFFU);
     address_high = (uint8_t)((frame_data >> 8U) & 0xFFU);
@@ -90,6 +116,11 @@ static uint8_t Drv_IrRemote_FinalizeFrame(uint32_t frame_data, uint16_t *address
     return 1U;
 }
 
+/**
+ * @brief  初始化红外遥控接收驱动
+ * @param  无
+ * @retval 无
+ */
 void Drv_IrRemote_Init(void)
 {
     GPIO_InitTypeDef gpio_init_structure;
@@ -140,10 +171,15 @@ void Drv_IrRemote_Init(void)
     g_ir_runtime.last_command = 0U;
 }
 
+/**
+ * @brief  红外接收中断处理函数
+ * @param  无
+ * @retval 无
+ */
 void Drv_IrRemote_IrqHandler(void)
 {
-    uint32_t now_tick;
-    uint32_t delta_tick;
+    uint32_t now_tick;    /* 当前下降沿对应的计时器计数值 */
+    uint32_t delta_tick;  /* 与上一下降沿之间的时间间隔 */
 
     if (EXTI_GetITStatus(EXTI_Line5) == RESET)
     {
@@ -211,8 +247,8 @@ void Drv_IrRemote_IrqHandler(void)
     g_ir_runtime.bit_index++;
     if (g_ir_runtime.bit_index >= 32U)
     {
-        uint16_t address;
-        uint8_t command;
+        uint16_t address;  /* 当前帧解析出的地址码 */
+        uint8_t command;   /* 当前帧解析出的命令码 */
 
         if (Drv_IrRemote_FinalizeFrame(g_ir_runtime.frame_data, &address, &command) != 0U)
         {
@@ -226,9 +262,14 @@ void Drv_IrRemote_IrqHandler(void)
     }
 }
 
+/**
+ * @brief  读取一条红外事件并清空事件缓存
+ * @param  无
+ * @retval 读取到的红外事件
+ */
 DrvIrRemoteEvent_t Drv_IrRemote_GetEvent(void)
 {
-    DrvIrRemoteEvent_t event;
+    DrvIrRemoteEvent_t event;  /* 返回给上层的红外事件 */
 
     __disable_irq();
     event = g_ir_event;
