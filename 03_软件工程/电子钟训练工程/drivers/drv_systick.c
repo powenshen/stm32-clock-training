@@ -1,9 +1,11 @@
 #include "drv_systick.h"
 
-static volatile uint32_t g_systick_ms = 0U;
+static volatile uint32_t g_systick_ms = 0U;  /* 全局 1ms 系统节拍计数 */
 
 /**
  * @brief  初始化 SysTick 定时器来产生 1ms 的系统节拍
+ * @param  无
+ * @retval 无
  */
 void Drv_Systick_Init(void)
 {
@@ -11,7 +13,9 @@ void Drv_Systick_Init(void)
 }
 
 /**
- * @brief  全局系统时间戳 g_systick_ms 更新函数
+ * @brief  SysTick 中断处理函数，负责累加系统节拍
+ * @param  无
+ * @retval 无
  */
 void Drv_Systick_IrqHandler(void)
 {
@@ -20,6 +24,8 @@ void Drv_Systick_IrqHandler(void)
 
 /**
  * @brief  返回当前系统时间戳
+ * @param  无
+ * @retval 当前系统毫秒计数
  */
 uint32_t Drv_Systick_Millis(void)
 {
@@ -28,10 +34,13 @@ uint32_t Drv_Systick_Millis(void)
 
 /**
  * @brief  判断距离上次事件是否已经过了指定的时间周期
+ * @param  last_tick: 上次事件时间戳指针
+ * @param  period_ms: 需要判断的周期毫秒值
+ * @retval 1 表示已到周期，0 表示未到周期
  */
 uint8_t Drv_Systick_IsElapsed(uint32_t *last_tick, uint32_t period_ms)
 {
-    uint32_t now;
+    uint32_t now;  /* 当前系统毫秒计数 */
 
     now = Drv_Systick_Millis();
     if ((now - *last_tick) >= period_ms)

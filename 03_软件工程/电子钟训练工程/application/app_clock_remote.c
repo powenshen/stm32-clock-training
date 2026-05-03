@@ -17,6 +17,14 @@
 #define IR_CMD_EQ              0x09U
 #define IR_CMD_100_PLUS        0x19U
 
+/**
+ * @brief  将红外遥控事件映射为电子钟逻辑动作
+ * @param  clock: 电子钟状态对象指针
+ * @param  event: 红外遥控事件
+ * @param  ui_dirty: UI 刷新标志指针
+ * @param  settings_dirty: 参数保存标志指针
+ * @retval 无
+ */
 void AppClockRemote_HandleEvent(ClockContext_t *clock,
                                 DrvIrRemoteEvent_t event,
                                 uint8_t *ui_dirty,

@@ -11,20 +11,25 @@
 #include "bsp_lcd.h"
 #include "bsp_led.h"
 #include "bsp_touch.h"
-#include "drv_ir_remote.h"
 #include "drv_debug_uart.h"
+#include "drv_ir_remote.h"
 #include "drv_key.h"
 #include "drv_rtc.h"
 #include "drv_systick.h"
 
-static ClockContext_t g_clock;
-static TouchUiState_t g_touch_ui;
-static uint8_t g_ui_dirty = 1U;
-static uint8_t g_settings_dirty = 0U;
+static ClockContext_t g_clock;          /* 电子钟应用全局状态 */
+static TouchUiState_t g_touch_ui;       /* 触摸交互运行时状态 */
+static uint8_t g_ui_dirty = 1U;         /* LCD 界面待刷新标志 */
+static uint8_t g_settings_dirty = 0U;   /* 参数待保存标志 */
 
+/**
+ * @brief  电子钟应用初始化总入口
+ * @param  无
+ * @retval 无
+ */
 void App_Clock_Init(void)
 {
-    DrvRtcTime_t default_time;
+    DrvRtcTime_t default_time;  /* RTC 初始化默认时间 */
 
     AppClockCore_InitContext(&g_clock);
     AppClockUi_Init(&g_touch_ui);
@@ -67,17 +72,27 @@ void App_Clock_Init(void)
     AppClockCore_PrintState(&g_clock, "boot");
 }
 
+/**
+ * @brief  电子钟 1ms 周期任务入口
+ * @param  无
+ * @retval 无
+ */
 void App_Clock_Task1ms(void)
 {
     Drv_Key_Task1ms();
     Drv_Rtc_Task1ms();
 }
 
+/**
+ * @brief  电子钟主循环任务入口
+ * @param  无
+ * @retval 无
+ */
 void App_Clock_Task(void)
 {
-    static uint32_t last_printed_second = 0xFFFFFFFFUL;
-    DrvRtcTime_t now;
-    uint32_t now_seconds;
+    static uint32_t last_printed_second = 0xFFFFFFFFUL;  /* 上次输出到串口的秒计数 */
+    DrvRtcTime_t now;                                    /* 当前 RTC 时间快照 */
+    uint32_t now_seconds;                                /* 当前时间对应的当天秒数 */
 
     AppClockCore_HandleKeyEvent(&g_clock, Drv_Key_GetEvent(), &g_ui_dirty, &g_settings_dirty);
     AppClockUi_HandleTouch(&g_clock, &g_touch_ui, &g_ui_dirty, &g_settings_dirty);

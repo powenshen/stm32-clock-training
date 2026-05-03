@@ -8,33 +8,38 @@
 
 typedef struct
 {
-    GPIO_TypeDef *port;
-    uint16_t pin;
+    GPIO_TypeDef *port;  /* 按键所在 GPIO 端口 */
+    uint16_t pin;        /* 按键对应 GPIO 引脚 */
 } KeyHardware_t;
 
 typedef struct
 {
-    uint8_t stable_level;
-    uint8_t sample_level;
-    uint16_t stable_count;
-    uint16_t pressed_ms;
-    uint16_t repeat_ms;
-    uint8_t long_press_reported;
+    uint8_t stable_level;          /* 当前稳定按键电平 */
+    uint8_t sample_level;          /* 最近一次采样到的按键电平 */
+    uint16_t stable_count;         /* 当前采样电平已持续的毫秒数 */
+    uint16_t pressed_ms;           /* 按下持续时间计数 */
+    uint16_t repeat_ms;            /* 长按连发间隔计数 */
+    uint8_t long_press_reported;   /* 长按事件是否已经上报 */
 } KeyRuntime_t;
 
-static volatile KeyEvent_t g_key_event = {KEY_ID_NONE, KEY_EVENT_TYPE_NONE};
+static volatile KeyEvent_t g_key_event = {KEY_ID_NONE, KEY_EVENT_TYPE_NONE};  /* 待主循环读取的按键事件缓存 */
 
-static const KeyHardware_t g_key_hardware[BOARD_KEY_COUNT] =
+static const KeyHardware_t g_key_hardware[BOARD_KEY_COUNT] =  /* 板级按键硬件映射表 */
 {
     {BOARD_KEY1_PORT, BOARD_KEY1_PIN},
     {BOARD_KEY2_PORT, BOARD_KEY2_PIN}
 };
 
-static KeyRuntime_t g_key_runtime[BOARD_KEY_COUNT];
+static KeyRuntime_t g_key_runtime[BOARD_KEY_COUNT];  /* 每个按键各自的扫描运行时状态 */
 
+/**
+ * @brief  读取指定按键的原始电平状态
+ * @param  key_index: 按键索引
+ * @retval 1 表示按下，0 表示松开
+ */
 static uint8_t Drv_Key_ReadRaw(uint8_t key_index)
 {
-    uint8_t pin_state;
+    uint8_t pin_state;  /* GPIO 实际读回的引脚电平 */
 
     pin_state = (uint8_t)GPIO_ReadInputDataBit(g_key_hardware[key_index].port, g_key_hardware[key_index].pin);
 #if BOARD_KEY_ACTIVE_LOW
@@ -44,6 +49,12 @@ static uint8_t Drv_Key_ReadRaw(uint8_t key_index)
 #endif
 }
 
+/**
+ * @brief  压入一条按键事件
+ * @param  key_id: 按键编号
+ * @param  type: 按键事件类型
+ * @retval 无
+ */
 static void Drv_Key_PushEvent(KeyId_t key_id, KeyEventType_t type)
 {
     if (g_key_event.type != KEY_EVENT_TYPE_NONE)
@@ -55,9 +66,14 @@ static void Drv_Key_PushEvent(KeyId_t key_id, KeyEventType_t type)
     g_key_event.type = type;
 }
 
+/**
+ * @brief  初始化按键驱动
+ * @param  无
+ * @retval 无
+ */
 void Drv_Key_Init(void)
 {
-    GPIO_InitTypeDef gpio_init_structure;
+    GPIO_InitTypeDef gpio_init_structure;  /* 按键 GPIO 初始化参数 */
 
     RCC_APB2PeriphClockCmd(BOARD_KEY1_RCC | BOARD_KEY2_RCC, ENABLE);
 
@@ -71,14 +87,19 @@ void Drv_Key_Init(void)
     GPIO_Init(BOARD_KEY2_PORT, &gpio_init_structure);
 }
 
+/**
+ * @brief  按键 1ms 周期扫描任务
+ * @param  无
+ * @retval 无
+ */
 void Drv_Key_Task1ms(void)
 {
-    uint8_t key_index;
+    uint8_t key_index;  /* 当前扫描的按键索引 */
 
     for (key_index = 0U; key_index < BOARD_KEY_COUNT; key_index++)
     {
-        KeyRuntime_t *runtime;
-        uint8_t sample_level;
+        KeyRuntime_t *runtime;  /* 当前按键的运行时状态对象 */
+        uint8_t sample_level;   /* 本次扫描读到的原始电平 */
 
         runtime = &g_key_runtime[key_index];
         sample_level = Drv_Key_ReadRaw(key_index);
@@ -140,9 +161,14 @@ void Drv_Key_Task1ms(void)
     }
 }
 
+/**
+ * @brief  读取一条按键事件并清空事件缓存
+ * @param  无
+ * @retval 按键事件结构
+ */
 KeyEvent_t Drv_Key_GetEvent(void)
 {
-    KeyEvent_t event;
+    KeyEvent_t event;  /* 准备返回给上层的按键事件 */
 
     __disable_irq();
     event = g_key_event;

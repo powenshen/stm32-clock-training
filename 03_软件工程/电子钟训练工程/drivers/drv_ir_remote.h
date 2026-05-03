@@ -16,9 +16,9 @@ typedef enum
 
 typedef struct
 {
-    uint16_t address;
-    uint8_t command;
-    DrvIrRemoteEventType_t type;
+    uint16_t address;              /* 红外协议地址码 */
+    uint8_t command;               /* 红外命令码 */
+    DrvIrRemoteEventType_t type;   /* 红外事件类型 */
 } DrvIrRemoteEvent_t;
 
 void Drv_IrRemote_Init(void);

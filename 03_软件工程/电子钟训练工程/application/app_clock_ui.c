@@ -14,8 +14,14 @@
 #define APP_TOUCH_REPEAT_START_MS    400UL
 #define APP_TOUCH_REPEAT_PERIOD_MS   150UL
 
-/*
- * Split the bottom tool area into four equal touch buttons.
+/**
+ * @brief  计算逻辑触摸按钮的屏幕矩形区域
+ * @param  button_id: 逻辑按钮编号
+ * @param  x: 按钮左上角 X 坐标输出指针
+ * @param  y: 按钮左上角 Y 坐标输出指针
+ * @param  width: 按钮宽度输出指针
+ * @param  height: 按钮高度输出指针
+ * @retval 无
  */
 static void AppClockUi_GetButtonRect(AppTouchButtonId_t button_id,
                                      uint16_t *x,
@@ -23,13 +29,13 @@ static void AppClockUi_GetButtonRect(AppTouchButtonId_t button_id,
                                      uint16_t *width,
                                      uint16_t *height)
 {
-    uint16_t screen_width;
-    uint16_t screen_height;
-    uint16_t margin;
-    uint16_t gap;
-    uint16_t button_width;
-    uint16_t button_height;
-    uint16_t base_x;
+    uint16_t screen_width;   /* LCD 当前横向像素宽度 */
+    uint16_t screen_height;  /* LCD 当前纵向像素高度 */
+    uint16_t margin;         /* 按钮区域外边距 */
+    uint16_t gap;            /* 按钮之间的水平间距 */
+    uint16_t button_width;   /* 单个按钮宽度 */
+    uint16_t button_height;  /* 单个按钮高度 */
+    uint16_t base_x;         /* 当前按钮左上角 X 基准坐标 */
 
     screen_width = BSP_LCD_GetWidth();
     screen_height = BSP_LCD_GetHeight();
@@ -45,12 +51,14 @@ static void AppClockUi_GetButtonRect(AppTouchButtonId_t button_id,
     *height = button_height;
 }
 
-/*
- * Convert a screen point into one of the four logical touch buttons.
+/**
+ * @brief  根据触摸点坐标判断命中的逻辑按钮编号
+ * @param  point: 触摸点坐标指针
+ * @retval 命中的逻辑按钮编号
  */
 static AppTouchButtonId_t AppClockUi_GetTouchButtonId(const BspTouchPoint_t *point)
 {
-    AppTouchButtonId_t button_id;
+    AppTouchButtonId_t button_id;  /* 当前遍历的逻辑按钮编号 */
 
     if (point == 0)
     {
@@ -59,10 +67,10 @@ static AppTouchButtonId_t AppClockUi_GetTouchButtonId(const BspTouchPoint_t *poi
 
     for (button_id = APP_TOUCH_BUTTON_1; button_id <= APP_TOUCH_BUTTON_4; button_id++)
     {
-        uint16_t x;
-        uint16_t y;
-        uint16_t width;
-        uint16_t height;
+        uint16_t x;       /* 按钮左上角 X 坐标 */
+        uint16_t y;       /* 按钮左上角 Y 坐标 */
+        uint16_t width;   /* 按钮宽度 */
+        uint16_t height;  /* 按钮高度 */
 
         AppClockUi_GetButtonRect(button_id, &x, &y, &width, &height);
         if ((point->x >= x) && (point->x < (uint16_t)(x + width)) &&
@@ -75,19 +83,24 @@ static AppTouchButtonId_t AppClockUi_GetTouchButtonId(const BspTouchPoint_t *poi
     return APP_TOUCH_BUTTON_NONE;
 }
 
-/*
- * Draw one logical tool button with a pressed-state inversion effect.
+/**
+ * @brief  绘制一个逻辑触摸按钮
+ * @param  button_id: 逻辑按钮编号
+ * @param  label: 按钮显示文本
+ * @param  base_color: 按钮基础颜色
+ * @param  pressed: 按钮是否处于按下态
+ * @retval 无
  */
 static void AppClockUi_DrawTouchButton(AppTouchButtonId_t button_id,
                                        const char *label,
                                        uint16_t base_color,
                                        uint8_t pressed)
 {
-    uint16_t x;
-    uint16_t y;
-    uint16_t width;
-    uint16_t height;
-    uint16_t fill_color;
+    uint16_t x;           /* 按钮左上角 X 坐标 */
+    uint16_t y;           /* 按钮左上角 Y 坐标 */
+    uint16_t width;       /* 按钮宽度 */
+    uint16_t height;      /* 按钮高度 */
+    uint16_t fill_color;  /* 当前按钮填充颜色 */
 
     AppClockUi_GetButtonRect(button_id, &x, &y, &width, &height);
     fill_color = base_color;
@@ -107,6 +120,11 @@ static void AppClockUi_DrawTouchButton(AppTouchButtonId_t button_id,
                                2U);
 }
 
+/**
+ * @brief  初始化触摸交互运行时状态
+ * @param  touch_ui: 触摸交互状态对象指针
+ * @retval 无
+ */
 void AppClockUi_Init(TouchUiState_t *touch_ui)
 {
     touch_ui->pressed = 0U;
@@ -116,18 +134,23 @@ void AppClockUi_Init(TouchUiState_t *touch_ui)
     touch_ui->last_repeat_tick = 0U;
 }
 
-/*
- * Handle touch press/release transitions and translate them into logical clock actions.
+/**
+ * @brief  处理触摸按下与释放，并转换为电子钟逻辑动作
+ * @param  clock: 电子钟状态对象指针
+ * @param  touch_ui: 触摸交互状态对象指针
+ * @param  ui_dirty: UI 刷新标志指针
+ * @param  settings_dirty: 参数保存标志指针
+ * @retval 无
  */
 void AppClockUi_HandleTouch(ClockContext_t *clock,
                             TouchUiState_t *touch_ui,
                             uint8_t *ui_dirty,
                             uint8_t *settings_dirty)
 {
-    BspTouchPoint_t point;
-    uint8_t is_pressed;
-    uint32_t now_tick;
-    AppTouchButtonId_t hit_button;
+    BspTouchPoint_t point;        /* 当前采样到的触摸点坐标 */
+    uint8_t is_pressed;           /* 当前是否检测到有效按压 */
+    uint32_t now_tick;            /* 当前系统毫秒计数 */
+    AppTouchButtonId_t hit_button;/* 当前命中的逻辑按钮编号 */
 
     now_tick = Drv_Systick_Millis();
     is_pressed = BSP_Touch_GetPoint(&point, BSP_LCD_GetScanMode(), BSP_LCD_GetWidth(), BSP_LCD_GetHeight());
@@ -144,7 +167,6 @@ void AppClockUi_HandleTouch(ClockContext_t *clock,
             touch_ui->last_repeat_tick = now_tick;
             *ui_dirty = 1U;
 
-            /* PLUS/MINUS should react immediately in edit mode. */
             if ((AppClockCore_IsEditView(clock->view) != 0U) &&
                 ((hit_button == APP_TOUCH_BUTTON_3) || (hit_button == APP_TOUCH_BUTTON_4)))
             {
@@ -169,8 +191,8 @@ void AppClockUi_HandleTouch(ClockContext_t *clock,
 
     if (touch_ui->pressed != 0U)
     {
-        AppTouchButtonId_t released_button;
-        uint8_t send_release_action;
+        AppTouchButtonId_t released_button;  /* 刚刚释放的逻辑按钮编号 */
+        uint8_t send_release_action;         /* 是否需要在释放时补发一次逻辑动作 */
 
         released_button = touch_ui->active_button;
         send_release_action = (uint8_t)(touch_ui->press_action_sent == 0U);
@@ -187,19 +209,24 @@ void AppClockUi_HandleTouch(ClockContext_t *clock,
     }
 }
 
-/*
- * Render the current clock state to the LCD.
+/**
+ * @brief  将当前电子钟状态绘制到 LCD
+ * @param  clock: 电子钟状态对象指针
+ * @param  touch_ui: 触摸交互状态对象指针
+ * @param  ui_dirty: UI 刷新标志指针
+ * @param  now: 当前 RTC 时间指针
+ * @retval 无
  */
 void AppClockUi_Render(const ClockContext_t *clock,
                        const TouchUiState_t *touch_ui,
                        uint8_t *ui_dirty,
                        const DrvRtcTime_t *now)
 {
-    char time_string[16];
-    char line_buffer[32];
-    const DrvRtcTime_t *display_time;
-    uint16_t screen_width;
-    uint16_t time_bg_color;
+    char time_string[16];               /* 主时间显示字符串缓存 */
+    char line_buffer[32];               /* 普通文本行缓存 */
+    const DrvRtcTime_t *display_time;   /* 当前需要显示的时间对象 */
+    uint16_t screen_width;              /* LCD 当前横向像素宽度 */
+    uint16_t time_bg_color;             /* 主时间区域背景色 */
 
     screen_width = BSP_LCD_GetWidth();
     display_time = (AppClockCore_IsEditView(clock->view) != 0U) ? &clock->edit_time : now;
