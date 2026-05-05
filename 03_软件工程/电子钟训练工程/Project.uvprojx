@@ -660,6 +660,11 @@
               <FilePath>.\bsp\board_config.h</FilePath>
             </File>
             <File>
+              <FileName>sim_debug_config.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\bsp\sim_debug_config.h</FilePath>
+            </File>
+            <File>
               <FileName>bsp_buzzer.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\bsp\bsp_buzzer.c</FilePath>
@@ -778,6 +783,16 @@
               <FileName>app_clock.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\application\app_clock.h</FilePath>
+            </File>
+            <File>
+              <FileName>app_clock_sim.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\application\app_clock_sim.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_clock_sim.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\application\app_clock_sim.h</FilePath>
             </File>
             <File>
               <FileName>app_clock_internal.h</FileName>

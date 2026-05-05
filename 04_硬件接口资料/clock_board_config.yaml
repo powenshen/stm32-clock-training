@@ -1,0 +1,160 @@
+board:
+  name: "野火 STM32F103 指南者"
+  mcu_family: "STM32F103"
+  purpose: "电子钟项目可直接复用的板级配置汇总"
+
+current_training_project:
+  led:
+    logical_name: "BOARD_LED"
+    mcu_pin: "PC13"
+    active_level: "low"
+    note: "当前训练工程使用的单灯配置，不等同于指南者板载 RGB LED"
+  key:
+    logical_name: "BOARD_KEY"
+    mcu_pin: "PA0"
+    active_level: "low"
+    note: "当前训练工程的单键配置，基本可对应指南者 KEY1"
+  debug_uart:
+    uart: "USART1"
+    tx: "PA9"
+    rx: "PA10"
+    baudrate: 115200
+
+confirmed_board_resources:
+  rgb_led:
+    type: "board_builtin_rgb_led"
+    active_level: "low"
+    pins:
+      red: "PB5"
+      green: "PB0"
+      blue: "PB1"
+    note: "来自指南者配套例程"
+
+  keys:
+    key1:
+      type: "board_push_button"
+      mcu_pin: "PA0"
+      active_level: "likely_low"
+      confidence: "medium_high"
+      note: "由原理图网络顺序推断，和当前训练工程一致"
+    key2:
+      type: "board_push_button"
+      mcu_pin: "PC13"
+      active_level: "likely_low"
+      confidence: "medium_high"
+      note: "由原理图网络顺序推断"
+    tpad:
+      type: "capacitive_touch_key"
+      mcu_pin: "PA1"
+      read_method: "adc_threshold"
+      confidence: "high"
+      note: "原理图明确标为电容按键，不属于普通机械按键"
+
+  buzzer:
+    signal_name: "BEEP"
+    mcu_pin: "PA8"
+    drive_type: "board_transistor_driver"
+    active_level: "unknown"
+    confidence: "high"
+    note: "已确认控制脚，电平极性待后续看驱动或上板验证"
+
+  infrared:
+    signal_name: "IR_RX"
+    mcu_pin: "PE5"
+    receiver_type: "external_1838_or_HS0038B"
+    idle_level: "typically_high"
+    active_pulse: "typically_low"
+    installed_by_default: false
+    confidence: "high"
+    note: "原理图写明可外接，默认没有"
+
+  rtc:
+    type: "stm32_internal_rtc"
+    lse_pins:
+      osc32_in: "PC14"
+      osc32_out: "PC15"
+    backup_battery: "CR1220"
+    backup_supported: true
+    note: "规格书明确有 RTC 电池座，可用于断电走时"
+
+  debug_uart:
+    chip: "CH340"
+    uart: "USART1"
+    tx: "PA9"
+    rx: "PA10"
+    baudrate: 115200
+
+  spi_flash:
+    chip: "W25Q64"
+    bus: "SPI1"
+    cs: "PC0"
+    sck: "PA5"
+    miso: "PA6"
+    mosi: "PA7"
+    note: "用于字库、触摸参数等，readme 文字里出现 SPI3 表述，但例程头文件与引脚组合对应 SPI1"
+
+  lcd:
+    size: "3.2_inch"
+    bus: "fsmc_8080_parallel"
+    controllers_supported:
+      - "ST7789V"
+      - "ILI9341"
+    control_pins:
+      cs: "PD7"
+      dc_a16: "PD11"
+      wr: "PD5"
+      rd: "PD4"
+      rst: "PE1"
+      backlight: "PD12"
+    data_pins:
+      d0: "PD14"
+      d1: "PD15"
+      d2: "PD0"
+      d3: "PD1"
+      d4: "PE7"
+      d5: "PE8"
+      d6: "PE9"
+      d7: "PE10"
+      d8: "PE11"
+      d9: "PE12"
+      d10: "PE13"
+      d11: "PE14"
+      d12: "PE15"
+      d13: "PD8"
+      d14: "PD9"
+      d15: "PD10"
+    command_address: "0x60000000"
+    data_address: "0x60020000"
+
+  touch:
+    controller: "XPT2046"
+    bus: "gpio_soft_spi"
+    irq_pin: "PE4"
+    irq_active_level: "low"
+    sck: "PE0"
+    miso: "PE3"
+    mosi: "PE2"
+    cs: "PD13"
+
+unconfirmed_or_missing:
+  key3:
+    status: "not_found_in_current_docs_extract"
+    note: "目前没有找到明确标注为 KEY3 的板载机械按键定义"
+  key4:
+    status: "not_found_in_current_docs_extract"
+    note: "目前没有找到明确标注为 KEY4 的板载机械按键定义"
+  buzzer_active_level:
+    status: "needs_verification"
+  key1_key2_active_level:
+    status: "likely_low_but_should_verify_on_board"
+
+project_guidance:
+  if_you_need_multiple_physical_keys:
+    options:
+      - "先按 KEY1=PA0、KEY2=PC13 两键方案设计正式菜单"
+      - "把 T-PAD(PA1) 作为第三输入"
+      - "若一定要 KEY3/KEY4，需要继续查更完整板卡资料或直接看板丝印与实物"
+  if_you_need_alarm:
+    recommendation: "使用 PA8 控制 BEEP"
+  if_you_need_ir_remote:
+    recommendation: "使用 PE5 接红外接收驱动"

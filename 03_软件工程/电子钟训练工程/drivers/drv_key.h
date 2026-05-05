@@ -27,5 +27,6 @@ typedef struct
 void Drv_Key_Init(void);
 void Drv_Key_Task1ms(void);
 KeyEvent_t Drv_Key_GetEvent(void);
+void Drv_Key_SimSetLevel(KeyId_t key_id, uint8_t is_pressed);
 
 #endif

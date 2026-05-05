@@ -5,6 +5,7 @@
 
 void BSP_Buzzer_Init(void);
 void BSP_Buzzer_SetState(uint8_t is_on);
+uint8_t BSP_Buzzer_GetState(void);
 void BSP_Buzzer_On(void);
 void BSP_Buzzer_Off(void);
 void BSP_Buzzer_Toggle(void);
