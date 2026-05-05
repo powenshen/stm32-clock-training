@@ -1,6 +1,11 @@
 #include "bsp_led.h"
 
 #include "board_config.h"
+#include "sim_debug_config.h"
+
+#define BSP_LED_ALL_MASK    (BSP_LED_RED_MASK | BSP_LED_GREEN_MASK | BSP_LED_BLUE_MASK)
+
+static uint8_t g_led_mask = 0U;
 
 static void BSP_LED_WritePin(GPIO_TypeDef *port, uint16_t pin, uint8_t is_on)
 {
@@ -11,21 +16,15 @@ static void BSP_LED_WritePin(GPIO_TypeDef *port, uint16_t pin, uint8_t is_on)
 #endif
 }
 
-static uint8_t BSP_LED_IsPinOn(GPIO_TypeDef *port, uint16_t pin)
-{
-    uint8_t pin_level;
-
-    pin_level = (uint8_t)GPIO_ReadOutputDataBit(port, pin);
-#if BOARD_LED_ACTIVE_LOW
-    return (uint8_t)!pin_level;
-#else
-    return pin_level;
-#endif
-}
-
 void BSP_LED_Init(void)
 {
     GPIO_InitTypeDef gpio_init_structure;
+
+    g_led_mask = 0U;
+
+#if APP_CLOCK_SIM_ENABLED
+    return;
+#endif
 
     RCC_APB2PeriphClockCmd(BOARD_LED_RCC, ENABLE);
 
@@ -39,31 +38,23 @@ void BSP_LED_Init(void)
 
 void BSP_LED_SetMask(uint8_t mask)
 {
-    BSP_LED_WritePin(BOARD_LED_RED_PORT, BOARD_LED_RED_PIN, (uint8_t)((mask & BSP_LED_RED_MASK) != 0U));
-    BSP_LED_WritePin(BOARD_LED_GREEN_PORT, BOARD_LED_GREEN_PIN, (uint8_t)((mask & BSP_LED_GREEN_MASK) != 0U));
-    BSP_LED_WritePin(BOARD_LED_BLUE_PORT, BOARD_LED_BLUE_PIN, (uint8_t)((mask & BSP_LED_BLUE_MASK) != 0U));
+    g_led_mask = (uint8_t)(mask & BSP_LED_ALL_MASK);
+
+#if !APP_CLOCK_SIM_ENABLED
+    BSP_LED_WritePin(BOARD_LED_RED_PORT, BOARD_LED_RED_PIN, (uint8_t)((g_led_mask & BSP_LED_RED_MASK) != 0U));
+    BSP_LED_WritePin(BOARD_LED_GREEN_PORT, BOARD_LED_GREEN_PIN, (uint8_t)((g_led_mask & BSP_LED_GREEN_MASK) != 0U));
+    BSP_LED_WritePin(BOARD_LED_BLUE_PORT, BOARD_LED_BLUE_PIN, (uint8_t)((g_led_mask & BSP_LED_BLUE_MASK) != 0U));
+#endif
 }
 
 void BSP_LED_ToggleMask(uint8_t mask)
 {
-    if ((mask & BSP_LED_RED_MASK) != 0U)
-    {
-        BSP_LED_WritePin(BOARD_LED_RED_PORT, BOARD_LED_RED_PIN, (uint8_t)!BSP_LED_IsPinOn(BOARD_LED_RED_PORT, BOARD_LED_RED_PIN));
-    }
+    BSP_LED_SetMask((uint8_t)(g_led_mask ^ (mask & BSP_LED_ALL_MASK)));
+}
 
-    if ((mask & BSP_LED_GREEN_MASK) != 0U)
-    {
-        BSP_LED_WritePin(BOARD_LED_GREEN_PORT,
-                         BOARD_LED_GREEN_PIN,
-                         (uint8_t)!BSP_LED_IsPinOn(BOARD_LED_GREEN_PORT, BOARD_LED_GREEN_PIN));
-    }
-
-    if ((mask & BSP_LED_BLUE_MASK) != 0U)
-    {
-        BSP_LED_WritePin(BOARD_LED_BLUE_PORT,
-                         BOARD_LED_BLUE_PIN,
-                         (uint8_t)!BSP_LED_IsPinOn(BOARD_LED_BLUE_PORT, BOARD_LED_BLUE_PIN));
-    }
+uint8_t BSP_LED_GetMask(void)
+{
+    return g_led_mask;
 }
 
 void BSP_LED_AllOff(void)

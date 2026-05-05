@@ -1,6 +1,8 @@
 #include "stm32f10x.h"
 
 #include "app_clock.h"
+#include "app_clock_sim.h"
+#include "sim_debug_config.h"
 
 /**
  * @brief  Main program.
@@ -9,10 +11,14 @@
  */
 int main(void)
 {
+#if APP_CLOCK_SIM_ENABLED
+    AppClockSim_Main();
+#else
     App_Clock_Init();
 
     while (1)
     {
         App_Clock_Task();
     }
+#endif
 }

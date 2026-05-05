@@ -16,39 +16,41 @@
 #include "drv_key.h"
 #include "drv_rtc.h"
 #include "drv_systick.h"
+#include "sim_debug_config.h"
 
-static ClockContext_t g_clock;          /* 电子钟应用全局状态 */
-static TouchUiState_t g_touch_ui;       /* 触摸交互运行时状态 */
-static uint8_t g_ui_dirty = 1U;         /* LCD 界面待刷新标志 */
-static uint8_t g_settings_dirty = 0U;   /* 参数待保存标志 */
+static ClockContext_t g_clock;
+static TouchUiState_t g_touch_ui;
+static uint8_t g_ui_dirty = 1U;
+static uint8_t g_settings_dirty = 0U;
 
-/**
- * @brief  电子钟应用初始化总入口
- * @param  无
- * @retval 无
- */
 void App_Clock_Init(void)
 {
-    DrvRtcTime_t default_time;  /* RTC 初始化默认时间 */
+    DrvRtcTime_t default_time;
 
     AppClockCore_InitContext(&g_clock);
     AppClockUi_Init(&g_touch_ui);
     g_ui_dirty = 1U;
+    g_settings_dirty = 0U;
 
     BSP_LED_Init();
     BSP_Buzzer_Init();
     Drv_Key_Init();
+    Drv_Systick_Init();
+
+#if !APP_CLOCK_SIM_ENABLED
     Drv_IrRemote_Init();
     Drv_DebugUart_Init();
-    Drv_Systick_Init();
     BSP_LCD_Init();
     BSP_Touch_Init();
+#endif
 
     default_time.hour = 12U;
     default_time.minute = 0U;
     default_time.second = 0U;
 
     g_clock.rtc_source = Drv_Rtc_Init(&default_time);
+
+#if !APP_CLOCK_SIM_ENABLED
     AppClockStorage_Init();
     if (AppClockStorage_Load(&g_clock) != 0U)
     {
@@ -69,34 +71,30 @@ void App_Clock_Init(void)
     Drv_DebugUart_SendString("Buzzer ready: PA8 gate control enabled.\n");
     Drv_DebugUart_SendString("Touch buttons ready: TIME / ON-OFF / STATE / ALARM\n");
     Drv_DebugUart_SendString("Edit buttons ready : NEXT / BACK / PLUS / MINUS\n");
-    AppClockCore_PrintState(&g_clock, "boot");
+#endif
+
+    AppClockCore_PrintState(&g_clock, APP_CLOCK_SIM_ENABLED ? "sim-boot" : "boot");
 }
 
-/**
- * @brief  电子钟 1ms 周期任务入口
- * @param  无
- * @retval 无
- */
 void App_Clock_Task1ms(void)
 {
     Drv_Key_Task1ms();
     Drv_Rtc_Task1ms();
 }
 
-/**
- * @brief  电子钟主循环任务入口
- * @param  无
- * @retval 无
- */
 void App_Clock_Task(void)
 {
-    static uint32_t last_printed_second = 0xFFFFFFFFUL;  /* 上次输出到串口的秒计数 */
-    DrvRtcTime_t now;                                    /* 当前 RTC 时间快照 */
-    uint32_t now_seconds;                                /* 当前时间对应的当天秒数 */
+    static uint32_t last_printed_second = 0xFFFFFFFFUL;
+    DrvRtcTime_t now;
+    uint32_t now_seconds;
 
     AppClockCore_HandleKeyEvent(&g_clock, Drv_Key_GetEvent(), &g_ui_dirty, &g_settings_dirty);
+
+#if !APP_CLOCK_SIM_ENABLED
     AppClockUi_HandleTouch(&g_clock, &g_touch_ui, &g_ui_dirty, &g_settings_dirty);
     AppClockRemote_HandleEvent(&g_clock, Drv_IrRemote_GetEvent(), &g_ui_dirty, &g_settings_dirty);
+#endif
+
     AppClockCore_CheckEditTimeout(&g_clock, &g_ui_dirty);
 
     Drv_Rtc_GetTime(&now);
@@ -118,12 +116,39 @@ void App_Clock_Task(void)
 
     if (g_settings_dirty != 0U)
     {
+#if !APP_CLOCK_SIM_ENABLED
         AppClockStorage_Save(&g_clock);
+#endif
         g_settings_dirty = 0U;
     }
 
+#if !APP_CLOCK_SIM_ENABLED
     if (g_ui_dirty != 0U)
     {
         AppClockUi_Render(&g_clock, &g_touch_ui, &g_ui_dirty, &now);
     }
+#endif
+}
+
+void App_Clock_GetDebugSnapshot(AppClockDebugSnapshot_t *snapshot)
+{
+    if (snapshot == 0)
+    {
+        return;
+    }
+
+    Drv_Rtc_GetTime(&snapshot->now);
+    snapshot->alarm_time = g_clock.alarm_time;
+    snapshot->edit_time = g_clock.edit_time;
+    snapshot->systick_ms = Drv_Systick_Millis();
+    snapshot->last_activity_tick = g_clock.last_activity_tick;
+    snapshot->alarm_start_tick = g_clock.alarm_start_tick;
+    snapshot->view = (uint8_t)g_clock.view;
+    snapshot->rtc_source = (uint8_t)g_clock.rtc_source;
+    snapshot->alarm_enabled = g_clock.alarm_enabled;
+    snapshot->alarm_ringing = g_clock.alarm_ringing;
+    snapshot->mute_enabled = g_clock.mute_enabled;
+    snapshot->blink_state = g_clock.blink_state;
+    snapshot->led_mask = BSP_LED_GetMask();
+    snapshot->buzzer_on = BSP_Buzzer_GetState();
 }

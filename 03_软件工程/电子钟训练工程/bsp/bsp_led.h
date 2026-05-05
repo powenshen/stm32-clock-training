@@ -13,6 +13,7 @@ typedef enum
 void BSP_LED_Init(void);
 void BSP_LED_SetMask(uint8_t mask);
 void BSP_LED_ToggleMask(uint8_t mask);
+uint8_t BSP_LED_GetMask(void);
 void BSP_LED_AllOff(void);
 void BSP_LED_On(void);
 void BSP_LED_Off(void);

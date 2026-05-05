@@ -1,5 +1,7 @@
 #include "drv_systick.h"
 
+#include "sim_debug_config.h"
+
 static volatile uint32_t g_systick_ms = 0U;  /* 全局 1ms 系统节拍计数 */
 
 /**
@@ -9,7 +11,11 @@ static volatile uint32_t g_systick_ms = 0U;  /* 全局 1ms 系统节拍计数 */
  */
 void Drv_Systick_Init(void)
 {
+#if APP_CLOCK_SIM_ENABLED
+    g_systick_ms = 0U;
+#else
     SysTick_Config(SystemCoreClock / 1000U);
+#endif
 }
 
 /**

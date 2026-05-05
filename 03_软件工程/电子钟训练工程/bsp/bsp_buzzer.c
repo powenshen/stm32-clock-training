@@ -1,6 +1,9 @@
 #include "bsp_buzzer.h"
 
 #include "board_config.h"
+#include "sim_debug_config.h"
+
+static uint8_t g_buzzer_state = 0U;
 
 static void BSP_Buzzer_Write(uint8_t is_on)
 {
@@ -11,21 +14,15 @@ static void BSP_Buzzer_Write(uint8_t is_on)
 #endif
 }
 
-static uint8_t BSP_Buzzer_ReadState(void)
-{
-    uint8_t pin_level;
-
-    pin_level = (uint8_t)GPIO_ReadOutputDataBit(BOARD_BUZZER_PORT, BOARD_BUZZER_PIN);
-#if BOARD_BUZZER_ACTIVE_LOW
-    return (uint8_t)!pin_level;
-#else
-    return pin_level;
-#endif
-}
-
 void BSP_Buzzer_Init(void)
 {
     GPIO_InitTypeDef gpio_init_structure;
+
+    g_buzzer_state = 0U;
+
+#if APP_CLOCK_SIM_ENABLED
+    return;
+#endif
 
     RCC_APB2PeriphClockCmd(BOARD_BUZZER_RCC, ENABLE);
 
@@ -39,7 +36,16 @@ void BSP_Buzzer_Init(void)
 
 void BSP_Buzzer_SetState(uint8_t is_on)
 {
-    BSP_Buzzer_Write((uint8_t)(is_on != 0U));
+    g_buzzer_state = (uint8_t)(is_on != 0U);
+
+#if !APP_CLOCK_SIM_ENABLED
+    BSP_Buzzer_Write(g_buzzer_state);
+#endif
+}
+
+uint8_t BSP_Buzzer_GetState(void)
+{
+    return g_buzzer_state;
 }
 
 void BSP_Buzzer_On(void)
@@ -54,5 +60,5 @@ void BSP_Buzzer_Off(void)
 
 void BSP_Buzzer_Toggle(void)
 {
-    BSP_Buzzer_SetState((uint8_t)!BSP_Buzzer_ReadState());
+    BSP_Buzzer_SetState((uint8_t)!g_buzzer_state);
 }

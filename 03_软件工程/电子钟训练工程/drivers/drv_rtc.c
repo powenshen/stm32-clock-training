@@ -1,5 +1,6 @@
 #include "drv_rtc.h"
 
+#include "sim_debug_config.h"
 #include "stm32f10x_bkp.h"
 #include "stm32f10x_pwr.h"
 #include "stm32f10x_rcc.h"
@@ -174,17 +175,23 @@ DrvRtcSource_t Drv_Rtc_Init(const DrvRtcTime_t *default_time)
         initial_time.second = 0U;
     }
 
+    g_software_seconds = Drv_Rtc_TimeToSeconds(&initial_time);
+    g_software_ms = 0U;
     used_backup_time = 0U;
-    if (Drv_Rtc_InitHardware(Drv_Rtc_TimeToSeconds(&initial_time), &used_backup_time) != 0U)
+
+#if APP_CLOCK_SIM_ENABLED
+    g_rtc_hardware_active = 0U;
+    return DRV_RTC_SOURCE_SOFTWARE;
+#else
+    if (Drv_Rtc_InitHardware(g_software_seconds, &used_backup_time) != 0U)
     {
         g_rtc_hardware_active = 1U;
         return (used_backup_time != 0U) ? DRV_RTC_SOURCE_HARDWARE_BACKUP : DRV_RTC_SOURCE_HARDWARE_DEFAULT_TIME;
     }
 
     g_rtc_hardware_active = 0U;
-    g_software_seconds = Drv_Rtc_TimeToSeconds(&initial_time);
-    g_software_ms = 0U;
     return DRV_RTC_SOURCE_SOFTWARE;
+#endif
 }
 
 /**
