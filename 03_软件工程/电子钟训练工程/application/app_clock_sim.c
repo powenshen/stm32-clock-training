@@ -96,6 +96,7 @@ static void AppClockSim_RunKeyDriverChecks(void)
 
 static void AppClockSim_RunTimeEditChecks(void)
 {
+    DrvRtcTime_t now_time;
     uint8_t previous_minute;
 
     App_Clock_Init();
@@ -130,9 +131,10 @@ static void AppClockSim_RunTimeEditChecks(void)
 
     AppClockSim_KeyHold(KEY_ID_KEY1, APP_SIM_KEY_LONG_HOLD_MS);
     AppClockSim_RefreshSnapshot();
+    now_time = g_app_clock_sim_report.last_snapshot.now;
     APP_CLOCK_SIM_CHECK(time_edit_cancel_ok,
                         (g_app_clock_sim_report.last_snapshot.view == APP_VIEW_RUN) &&
-                        AppClockSim_TimeEquals(&g_app_clock_sim_report.last_snapshot.now, 12U, 34U, 56U));
+                        AppClockSim_TimeEquals(&now_time, 12U, 34U, 56U));
 }
 
 static void AppClockSim_RunEditTimeoutCheck(void)

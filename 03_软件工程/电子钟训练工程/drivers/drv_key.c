@@ -32,6 +32,7 @@ static const KeyHardware_t g_key_hardware[BOARD_KEY_COUNT] =
 };
 
 static KeyRuntime_t g_key_runtime[BOARD_KEY_COUNT];
+#if APP_CLOCK_SIM_ENABLED
 static uint8_t g_key_sim_levels[BOARD_KEY_COUNT];
 
 static int8_t Drv_Key_KeyIdToIndex(KeyId_t key_id)
@@ -48,6 +49,7 @@ static int8_t Drv_Key_KeyIdToIndex(KeyId_t key_id)
             return -1;
     }
 }
+#endif
 
 static uint8_t Drv_Key_ReadRaw(uint8_t key_index)
 {
@@ -92,7 +94,9 @@ void Drv_Key_Init(void)
         g_key_runtime[key_index].pressed_ms = 0U;
         g_key_runtime[key_index].repeat_ms = 0U;
         g_key_runtime[key_index].long_press_reported = 0U;
+#if APP_CLOCK_SIM_ENABLED
         g_key_sim_levels[key_index] = 0U;
+#endif
     }
 
 #if APP_CLOCK_SIM_ENABLED
@@ -195,6 +199,7 @@ KeyEvent_t Drv_Key_GetEvent(void)
 
 void Drv_Key_SimSetLevel(KeyId_t key_id, uint8_t is_pressed)
 {
+#if APP_CLOCK_SIM_ENABLED
     int8_t key_index;
 
     key_index = Drv_Key_KeyIdToIndex(key_id);
@@ -204,4 +209,8 @@ void Drv_Key_SimSetLevel(KeyId_t key_id, uint8_t is_pressed)
     }
 
     g_key_sim_levels[(uint8_t)key_index] = (uint8_t)(is_pressed != 0U);
+#else
+    (void)key_id;
+    (void)is_pressed;
+#endif
 }
