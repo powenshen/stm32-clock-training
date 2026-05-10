@@ -112,6 +112,7 @@ void App_Clock_Task(void)
     }
 
     AppClockCore_CheckAlarm(&g_clock, &now, &g_ui_dirty);
+    AppClockCore_CheckHourlyChime(&g_clock, &now);
     AppClockCore_UpdateIndicators(&g_clock, &g_ui_dirty);
 
     if (g_settings_dirty != 0U)
@@ -138,6 +139,7 @@ void App_Clock_GetDebugSnapshot(AppClockDebugSnapshot_t *snapshot)
     }
 
     Drv_Rtc_GetTime(&snapshot->now);
+    Drv_Rtc_GetDate(&snapshot->date);
     snapshot->alarm_time = g_clock.alarm_time;
     snapshot->edit_time = g_clock.edit_time;
     snapshot->systick_ms = Drv_Systick_Millis();
@@ -151,4 +153,20 @@ void App_Clock_GetDebugSnapshot(AppClockDebugSnapshot_t *snapshot)
     snapshot->blink_state = g_clock.blink_state;
     snapshot->led_mask = BSP_LED_GetMask();
     snapshot->buzzer_on = BSP_Buzzer_GetState();
+    snapshot->lcd_on = g_clock.lcd_on;
 }
+
+#if APP_CLOCK_SIM_ENABLED
+ClockContext_t *App_Clock_GetSimContext(void)
+{
+    return &g_clock;
+}
+
+void App_Clock_SimInjectTouch(AppTouchButtonId_t button_id, uint8_t is_hold)
+{
+    AppClockCore_TriggerKeySound(&g_clock);
+    AppClockCore_HandleTouchCommand(&g_clock, button_id, is_hold,
+                                    &g_ui_dirty, &g_settings_dirty);
+    App_Clock_Task();
+}
+#endif

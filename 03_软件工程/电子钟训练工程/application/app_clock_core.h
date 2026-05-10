@@ -39,5 +39,12 @@ void AppClockCore_ToggleMute(ClockContext_t *clock,
                              uint8_t *ui_dirty,
                              uint8_t *settings_dirty,
                              const char *reason);
+void AppClockCore_TriggerKeySound(ClockContext_t *clock);
+void AppClockCore_CheckHourlyChime(ClockContext_t *clock, const DrvRtcTime_t *now);
+void AppClockCore_ToggleLcdPower(ClockContext_t *clock, uint8_t *ui_dirty);
+void AppClockCore_HandleNumberEntry(ClockContext_t *clock,
+                                    uint8_t digit,
+                                    uint8_t *ui_dirty,
+                                    uint8_t *settings_dirty);
 
 #endif

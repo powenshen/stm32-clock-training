@@ -6,7 +6,7 @@
  * It can also be overridden from the compiler command line.
  */
 #ifndef APP_CLOCK_SIM_ENABLED
-#define APP_CLOCK_SIM_ENABLED    0U
+#define APP_CLOCK_SIM_ENABLED    1U
 #endif
 
 /*

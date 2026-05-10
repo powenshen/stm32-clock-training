@@ -1,12 +1,15 @@
 #ifndef APP_CLOCK_H
 #define APP_CLOCK_H
 
+#include "app_clock_internal.h"
 #include "drv_rtc.h"
+#include "sim_debug_config.h"
 #include "stm32f10x.h"
 
 typedef struct
 {
     DrvRtcTime_t now;
+    DrvRtcDate_t date;
     DrvRtcTime_t alarm_time;
     DrvRtcTime_t edit_time;
     uint32_t systick_ms;
@@ -20,11 +23,17 @@ typedef struct
     uint8_t blink_state;
     uint8_t led_mask;
     uint8_t buzzer_on;
+    uint8_t lcd_on;
 } AppClockDebugSnapshot_t;
 
 void App_Clock_Init(void);
 void App_Clock_Task(void);
 void App_Clock_Task1ms(void);
 void App_Clock_GetDebugSnapshot(AppClockDebugSnapshot_t *snapshot);
+
+#if APP_CLOCK_SIM_ENABLED
+ClockContext_t *App_Clock_GetSimContext(void);
+void App_Clock_SimInjectTouch(AppTouchButtonId_t button_id, uint8_t is_hold);
+#endif
 
 #endif

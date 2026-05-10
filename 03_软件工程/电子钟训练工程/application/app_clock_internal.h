@@ -41,6 +41,14 @@ typedef struct
     uint32_t last_alarm_second;     /* 上次检查过的秒值，用于防止重复触发 */
     uint32_t last_blink_tick;       /* 上次切换指示灯闪烁状态的毫秒时间戳 */
     uint8_t blink_state;            /* 当前闪烁输出状态 */
+    uint8_t chime_active;           /* 整点提示激活标志 */
+    uint32_t chime_start_tick;      /* 整点提示开始的毫秒时间戳 */
+    uint8_t key_sound_active;       /* 按键音激活标志 */
+    uint32_t key_sound_start_tick;  /* 按键音开始的毫秒时间戳 */
+    uint8_t lcd_on;                 /* LCD 显示开关标志，1=开，0=关 */
+    uint8_t num_entry_count;        /* 数字键输入计数 0=空闲, 1=已输入十位 */
+    uint8_t num_entry_buffer;       /* 数字键十位暂存 */
+    uint32_t num_entry_tick;        /* 数字键首次输入时间戳 */
 } ClockContext_t;
 
 typedef struct

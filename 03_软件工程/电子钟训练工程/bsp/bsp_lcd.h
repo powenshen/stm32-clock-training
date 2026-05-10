@@ -38,5 +38,7 @@ void BSP_LCD_DrawStringCentered(uint16_t x,
                                 uint16_t fg_color,
                                 uint16_t bg_color,
                                 uint8_t scale);
+void BSP_LCD_BacklightOn(void);
+void BSP_LCD_BacklightOff(void);
 
 #endif
