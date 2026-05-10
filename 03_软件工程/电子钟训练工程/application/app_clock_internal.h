@@ -43,6 +43,7 @@ typedef struct
     uint8_t blink_state;            /* 当前闪烁输出状态 */
     uint8_t chime_active;           /* 整点提示激活标志 */
     uint32_t chime_start_tick;      /* 整点提示开始的毫秒时间戳 */
+    uint32_t last_chime_second;     /* 上次触发整点提示的秒值，防止同一秒内重复触发 */
     uint8_t key_sound_active;       /* 按键音激活标志 */
     uint32_t key_sound_start_tick;  /* 按键音开始的毫秒时间戳 */
     uint8_t lcd_on;                 /* LCD 显示开关标志，1=开，0=关 */

@@ -424,8 +424,10 @@ uint8_t Drv_Rtc_GetDayOfWeek(const DrvRtcDate_t *date)
          + (int32_t)(j / 4U)
          - (int32_t)(2U * j)) % 7;
 
-    /* Convert: Zeller 0=Saturday -> return 0=Sunday */
-    return (uint8_t)((h + 1) % 7);
+    /* Normalize h to 0..6 (C99 % may produce negative), then convert:
+       Zeller 0=Sat→6, 1=Sun→0, 2=Mon→1, ... i.e. desired = (h+6)%7 */
+    h = ((h % 7) + 7) % 7;
+    return (uint8_t)((h + 6U) % 7U);
 }
 
 uint8_t Drv_Rtc_WasBackupLost(void)

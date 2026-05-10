@@ -241,6 +241,7 @@ static void AppClockCore_StopAlarm(ClockContext_t *clock, const char *reason, ui
     }
 
     clock->alarm_ringing = 0U;
+    clock->key_sound_active = 0U;
     BSP_Buzzer_Off();
     AppClockCore_InvalidateUi(ui_dirty);
     AppClockCore_PrintState(clock, reason);
@@ -287,6 +288,7 @@ void AppClockCore_InitContext(ClockContext_t *clock)
     clock->blink_state = 0U;
     clock->chime_active = 0U;
     clock->chime_start_tick = 0U;
+    clock->last_chime_second = 0xFFFFFFFFUL;
     clock->key_sound_active = 0U;
     clock->key_sound_start_tick = 0U;
     clock->lcd_on = 1U;
@@ -915,10 +917,15 @@ void AppClockCore_TriggerKeySound(ClockContext_t *clock)
  */
 void AppClockCore_CheckHourlyChime(ClockContext_t *clock, const DrvRtcTime_t *now)
 {
-    if ((now->minute == 0U) && (now->second == 0U) && (clock->chime_active == 0U))
+    uint32_t now_seconds;
+
+    now_seconds = AppClockCore_TimeToSeconds(now);
+    if ((now->minute == 0U) && (now->second == 0U) &&
+        (clock->chime_active == 0U) && (now_seconds != clock->last_chime_second))
     {
         clock->chime_active = 1U;
         clock->chime_start_tick = Drv_Systick_Millis();
+        clock->last_chime_second = now_seconds;
     }
 }
 
