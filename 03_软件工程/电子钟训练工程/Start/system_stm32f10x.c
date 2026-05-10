@@ -63,6 +63,7 @@
   */
 
 #include "stm32f10x.h"
+#include "sim_debug_config.h"
 
 /**
   * @}
@@ -211,6 +212,19 @@ static void SetSysClock(void);
   */
 void SystemInit (void)
 {
+#if APP_CLOCK_SIM_ENABLED
+  /*
+   * Simulation mode: skip all RCC/FLASH register access.
+   * After reset, HSI (8 MHz) is the default system clock source — sufficient
+   * for the Cortex-M3 instruction set simulator.
+   * SetSysClock() would loop forever waiting for HSE/PLL ready flags that the
+   * simulator never sets.
+   */
+  SCB->VTOR = FLASH_BASE | VECT_TAB_OFFSET;
+  SystemCoreClock = HSI_VALUE;
+  return;
+#endif
+
   /* Reset the RCC clock configuration to the default reset state(for debug purpose) */
   /* Set HSION bit */
   RCC->CR |= (uint32_t)0x00000001;

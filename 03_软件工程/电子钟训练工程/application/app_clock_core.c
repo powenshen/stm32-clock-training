@@ -12,8 +12,11 @@
 #include "drv_systick.h"
 
 #define APP_EDIT_TIMEOUT_MS          10000UL
-#define APP_ALARM_RING_MS            30000UL
+#define APP_ALARM_RING_MS            60000UL
 #define APP_ALARM_BLINK_PERIOD_MS    200UL
+#define APP_CHIME_DURATION_MS        300UL
+#define APP_KEY_SOUND_DURATION_MS     80UL
+#define APP_NUM_ENTRY_TIMEOUT_MS      2000UL
 
 /**
  * @brief  置位界面脏标志，通知主循环刷新 LCD
@@ -282,6 +285,14 @@ void AppClockCore_InitContext(ClockContext_t *clock)
     clock->last_alarm_second = 0xFFFFFFFFUL;
     clock->last_blink_tick = 0U;
     clock->blink_state = 0U;
+    clock->chime_active = 0U;
+    clock->chime_start_tick = 0U;
+    clock->key_sound_active = 0U;
+    clock->key_sound_start_tick = 0U;
+    clock->lcd_on = 1U;
+    clock->num_entry_count = 0U;
+    clock->num_entry_buffer = 0U;
+    clock->num_entry_tick = 0U;
 }
 
 /**
@@ -500,12 +511,37 @@ void AppClockCore_ToggleMute(ClockContext_t *clock,
 }
 
 /**
+ * @brief  切换 LCD 显示开关
+ * @param  clock: 电子钟状态对象指针
+ * @param  ui_dirty: UI 刷新标志指针
+ * @retval 无
+ */
+void AppClockCore_ToggleLcdPower(ClockContext_t *clock, uint8_t *ui_dirty)
+{
+    clock->lcd_on = (uint8_t)!clock->lcd_on;
+    AppClockCore_InvalidateUi(ui_dirty);
+    AppClockCore_PrintState(clock, clock->lcd_on != 0U ? "lcd-on" : "lcd-off");
+}
+
+/**
  * @brief  处理物理按键事件并更新核心状态
  * @param  clock: 电子钟状态对象指针
  * @param  event: 按键事件
  * @param  ui_dirty: UI 刷新标志指针
  * @param  settings_dirty: 参数保存标志指针
  * @retval 无
+ */
+/*
+ * Hardware limitation: the board provides 2 physical keys (KEY1=PA0, KEY2=PC13).
+ * The PPT requirement specifies 4 keys (KEY1=mode, KEY2=right-shift, KEY3=inc,
+ * KEY4=dec). The 2-key mapping used here:
+ *
+ *   RUN mode:   KEY1 click = enter time edit,  KEY1 long = toggle alarm
+ *               KEY2 click = debug print,       KEY2 long = enter alarm edit
+ *   EDIT mode:  KEY1 click = next field,        KEY1 long = cancel edit
+ *               KEY2 click = increment,          KEY2 long/repeat = decrement
+ *
+ * The 4-button touch UI and IR remote supplement the missing KEY3/KEY4 functions.
  */
 void AppClockCore_HandleKeyEvent(ClockContext_t *clock,
                                  KeyEvent_t event,
@@ -516,6 +552,8 @@ void AppClockCore_HandleKeyEvent(ClockContext_t *clock,
     {
         return;
     }
+
+    AppClockCore_TriggerKeySound(clock);
 
     if (clock->alarm_ringing != 0U)
     {
@@ -571,7 +609,7 @@ void AppClockCore_HandleKeyEvent(ClockContext_t *clock,
 
     if ((event.key_id == KEY_ID_KEY2) && (event.type == KEY_EVENT_TYPE_CLICK))
     {
-        AppClockCore_PrintState(clock, "run-click");
+        AppClockCore_ToggleMute(clock, ui_dirty, settings_dirty, "key-mute-toggle");
     }
 }
 
@@ -590,6 +628,8 @@ void AppClockCore_HandleTouchCommand(ClockContext_t *clock,
                                      uint8_t *ui_dirty,
                                      uint8_t *settings_dirty)
 {
+    AppClockCore_TriggerKeySound(clock);
+
     if (clock->alarm_ringing != 0U)
     {
         AppClockCore_StopAlarm(clock, "alarm-stop-touch", ui_dirty);
@@ -600,7 +640,11 @@ void AppClockCore_HandleTouchCommand(ClockContext_t *clock,
     {
         if (is_hold_action != 0U)
         {
-            if (button_id == APP_TOUCH_BUTTON_3)
+            if (button_id == APP_TOUCH_BUTTON_1)
+            {
+                AppClockCore_CancelEdit(clock, "touch-cancel", ui_dirty);
+            }
+            else if (button_id == APP_TOUCH_BUTTON_3)
             {
                 AppClockCore_AdjustEditValue(clock, 1, ui_dirty);
             }
@@ -613,11 +657,28 @@ void AppClockCore_HandleTouchCommand(ClockContext_t *clock,
 
         if (button_id == APP_TOUCH_BUTTON_1)
         {
-            AppClockCore_AdvanceEditView(clock, ui_dirty, settings_dirty);
+            /* KEY1 模式键: 最后字段则保存返回，否则推进到下一字段 */
+            if ((clock->view == APP_VIEW_SET_TIME_SECOND) ||
+                (clock->view == APP_VIEW_SET_ALARM_MINUTE))
+            {
+                if (clock->view == APP_VIEW_SET_TIME_SECOND)
+                {
+                    AppClockCore_SaveTimeEdit(clock, ui_dirty);
+                }
+                else
+                {
+                    AppClockCore_SaveAlarmEdit(clock, ui_dirty, settings_dirty);
+                }
+            }
+            else
+            {
+                AppClockCore_AdvanceEditView(clock, ui_dirty, settings_dirty);
+            }
         }
         else if (button_id == APP_TOUCH_BUTTON_2)
         {
-            AppClockCore_CancelEdit(clock, "touch-cancel", ui_dirty);
+            /* KEY2 右移: 推进到下一字段 */
+            AppClockCore_AdvanceEditView(clock, ui_dirty, settings_dirty);
         }
         return;
     }
@@ -630,19 +691,23 @@ void AppClockCore_HandleTouchCommand(ClockContext_t *clock,
     switch (button_id)
     {
         case APP_TOUCH_BUTTON_1:
+            /* KEY1 模式键: 进入改时 */
             AppClockCore_EnterTimeEdit(clock, ui_dirty);
             break;
 
         case APP_TOUCH_BUTTON_2:
-            AppClockCore_ToggleAlarmEnable(clock, ui_dirty, settings_dirty, "touch-alarm-toggle");
+            /* KEY2 右移: 进入闹钟编辑 */
+            AppClockCore_EnterAlarmEdit(clock, ui_dirty);
             break;
 
         case APP_TOUCH_BUTTON_3:
-            AppClockCore_PrintState(clock, "touch-state");
+            /* KEY3 加: 切换闹钟使能 */
+            AppClockCore_ToggleAlarmEnable(clock, ui_dirty, settings_dirty, "touch-alarm-toggle");
             break;
 
         case APP_TOUCH_BUTTON_4:
-            AppClockCore_EnterAlarmEdit(clock, ui_dirty);
+            /* KEY4 减: 切换静音 */
+            AppClockCore_ToggleMute(clock, ui_dirty, settings_dirty, "touch-mute-toggle");
             break;
 
         default:
@@ -660,15 +725,130 @@ void AppClockCore_CheckEditTimeout(ClockContext_t *clock, uint8_t *ui_dirty)
 {
     uint32_t now_tick;  /* 当前系统毫秒计数 */
 
-    if (AppClockCore_IsEditView(clock->view) == 0U)
+    if (AppClockCore_IsEditView(clock->view) != 0U)
+    {
+        now_tick = Drv_Systick_Millis();
+        if ((now_tick - clock->last_activity_tick) >= APP_EDIT_TIMEOUT_MS)
+        {
+            AppClockCore_CancelEdit(clock, "edit-timeout", ui_dirty);
+        }
+
+        /* Number entry timeout: commit single digit after idle */
+        if ((clock->num_entry_count == 1U) &&
+            ((now_tick - clock->num_entry_tick) >= APP_NUM_ENTRY_TIMEOUT_MS))
+        {
+            uint8_t field_limit;
+            uint8_t *field_ptr;
+
+            field_limit = 24U;
+            field_ptr = &clock->edit_time.hour;
+            switch (clock->view)
+            {
+                case APP_VIEW_SET_TIME_HOUR:
+                case APP_VIEW_SET_ALARM_HOUR:
+                    field_limit = 24U;
+                    field_ptr = &clock->edit_time.hour;
+                    break;
+                case APP_VIEW_SET_TIME_MINUTE:
+                case APP_VIEW_SET_ALARM_MINUTE:
+                    field_limit = 60U;
+                    field_ptr = &clock->edit_time.minute;
+                    break;
+                case APP_VIEW_SET_TIME_SECOND:
+                    field_limit = 60U;
+                    field_ptr = &clock->edit_time.second;
+                    break;
+                default:
+                    break;
+            }
+            if (field_ptr != 0)
+            {
+                *field_ptr = clock->num_entry_buffer % field_limit;
+                clock->num_entry_count = 0U;
+                AppClockCore_InvalidateUi(ui_dirty);
+            }
+        }
+    }
+    else
+    {
+        /* Not in edit view: reset number entry state */
+        clock->num_entry_count = 0U;
+    }
+}
+
+/**
+ * @brief  处理红外遥控数字键输入
+ * @param  clock: 电子钟状态对象指针
+ * @param  digit: 输入的数字 (0~9)
+ * @param  ui_dirty: UI 刷新标志指针
+ * @param  settings_dirty: 参数保存标志指针
+ * @retval 无
+ */
+void AppClockCore_HandleNumberEntry(ClockContext_t *clock,
+                                    uint8_t digit,
+                                    uint8_t *ui_dirty,
+                                    uint8_t *settings_dirty)
+{
+    uint8_t field_limit;
+    uint8_t *field_ptr;
+    uint32_t now_tick;
+
+    if ((digit > 9U) || (AppClockCore_IsEditView(clock->view) == 0U))
     {
         return;
     }
 
-    now_tick = Drv_Systick_Millis();
-    if ((now_tick - clock->last_activity_tick) >= APP_EDIT_TIMEOUT_MS)
+    switch (clock->view)
     {
-        AppClockCore_CancelEdit(clock, "edit-timeout", ui_dirty);
+        case APP_VIEW_SET_TIME_HOUR:
+        case APP_VIEW_SET_ALARM_HOUR:
+            field_limit = 24U;
+            field_ptr = &clock->edit_time.hour;
+            break;
+        case APP_VIEW_SET_TIME_MINUTE:
+        case APP_VIEW_SET_ALARM_MINUTE:
+            field_limit = 60U;
+            field_ptr = &clock->edit_time.minute;
+            break;
+        case APP_VIEW_SET_TIME_SECOND:
+            field_limit = 60U;
+            field_ptr = &clock->edit_time.second;
+            break;
+        default:
+            return;
+    }
+
+    now_tick = Drv_Systick_Millis();
+
+    if ((clock->num_entry_count > 0U) &&
+        ((now_tick - clock->num_entry_tick) >= APP_NUM_ENTRY_TIMEOUT_MS))
+    {
+        *field_ptr = clock->num_entry_buffer % field_limit;
+        clock->num_entry_count = 0U;
+        AppClockCore_InvalidateUi(ui_dirty);
+    }
+
+    if (clock->num_entry_count == 0U)
+    {
+        clock->num_entry_buffer = digit;
+        clock->num_entry_count = 1U;
+        clock->num_entry_tick = now_tick;
+        AppClockCore_InvalidateUi(ui_dirty);
+        return;
+    }
+
+    {
+        uint8_t value;
+        value = (uint8_t)(clock->num_entry_buffer * 10U + digit);
+        if (value >= field_limit)
+        {
+            value = (uint8_t)(value % field_limit);
+        }
+        *field_ptr = value;
+        clock->num_entry_count = 0U;
+        AppClockCore_RecordActivity(clock);
+        AppClockCore_InvalidateUi(ui_dirty);
+        AppClockCore_AdvanceEditView(clock, ui_dirty, settings_dirty);
     }
 }
 
@@ -713,6 +893,36 @@ void AppClockCore_CheckAlarm(ClockContext_t *clock, const DrvRtcTime_t *now, uin
 }
 
 /**
+ * @brief  触发按键音
+ * @param  clock: 电子钟状态对象指针
+ * @retval 无
+ */
+void AppClockCore_TriggerKeySound(ClockContext_t *clock)
+{
+    if (clock->mute_enabled != 0U)
+    {
+        return;
+    }
+    clock->key_sound_active = 1U;
+    clock->key_sound_start_tick = Drv_Systick_Millis();
+}
+
+/**
+ * @brief  检查整点提示条件
+ * @param  clock: 电子钟状态对象指针
+ * @param  now: 当前时间指针
+ * @retval 无
+ */
+void AppClockCore_CheckHourlyChime(ClockContext_t *clock, const DrvRtcTime_t *now)
+{
+    if ((now->minute == 0U) && (now->second == 0U) && (clock->chime_active == 0U))
+    {
+        clock->chime_active = 1U;
+        clock->chime_start_tick = Drv_Systick_Millis();
+    }
+}
+
+/**
  * @brief  根据当前状态更新 LED 与蜂鸣器输出
  * @param  clock: 电子钟状态对象指针
  * @param  ui_dirty: UI 刷新标志指针
@@ -720,8 +930,12 @@ void AppClockCore_CheckAlarm(ClockContext_t *clock, const DrvRtcTime_t *now, uin
  */
 void AppClockCore_UpdateIndicators(ClockContext_t *clock, uint8_t *ui_dirty)
 {
-    uint8_t led_mask;  /* 当前准备输出的 LED 颜色掩码 */
+    uint8_t led_mask;   /* 当前准备输出的 LED 颜色掩码 */
+    uint8_t buzzer_on;  /* 当前蜂鸣器输出状态 */
 
+    buzzer_on = 0U;
+
+    /* 1. Alarm ringing: blink LED + buzzer */
     if (clock->alarm_ringing != 0U)
     {
         if (Drv_Systick_IsElapsed(&clock->last_blink_tick, APP_ALARM_BLINK_PERIOD_MS) != 0U)
@@ -731,15 +945,44 @@ void AppClockCore_UpdateIndicators(ClockContext_t *clock, uint8_t *ui_dirty)
         }
 
         led_mask = (clock->blink_state != 0U) ? BSP_LED_RED_MASK : 0U;
+        buzzer_on = (uint8_t)((clock->blink_state != 0U) && (clock->mute_enabled == 0U));
+
         BSP_LED_SetMask(led_mask);
-        BSP_Buzzer_SetState((uint8_t)((clock->blink_state != 0U) && (clock->mute_enabled == 0U)));
+        BSP_Buzzer_SetState(buzzer_on);
         return;
     }
 
     clock->blink_state = 0U;
     clock->last_blink_tick = Drv_Systick_Millis();
-    BSP_Buzzer_Off();
 
+    /* 2. Hourly chime: sustained beep for APP_CHIME_DURATION_MS */
+    if (clock->chime_active != 0U)
+    {
+        if ((Drv_Systick_Millis() - clock->chime_start_tick) >= APP_CHIME_DURATION_MS)
+        {
+            clock->chime_active = 0U;
+        }
+        else
+        {
+            buzzer_on = 1U;
+        }
+    }
+    /* 3. Key press sound: short beep for APP_KEY_SOUND_DURATION_MS */
+    else if (clock->key_sound_active != 0U)
+    {
+        if ((Drv_Systick_Millis() - clock->key_sound_start_tick) >= APP_KEY_SOUND_DURATION_MS)
+        {
+            clock->key_sound_active = 0U;
+        }
+        else
+        {
+            buzzer_on = 1U;
+        }
+    }
+
+    BSP_Buzzer_SetState(buzzer_on);
+
+    /* LED control based on view */
     if ((clock->view == APP_VIEW_SET_TIME_HOUR) ||
         (clock->view == APP_VIEW_SET_TIME_MINUTE) ||
         (clock->view == APP_VIEW_SET_TIME_SECOND))

@@ -13,6 +13,8 @@
 static uint8_t g_rtc_hardware_active = 0U;  /* 当前是否启用硬件 RTC */
 static uint32_t g_software_seconds = 0UL;   /* 软件 RTC 的当天秒计数 */
 static uint16_t g_software_ms = 0U;         /* 软件 RTC 的毫秒累加计数 */
+static DrvRtcDate_t g_software_date;        /* 软件 RTC 的日期 */
+static uint8_t g_rtc_backup_was_lost = 0U;  /* 后备电池失效标志 */
 
 /**
  * @brief  检查时间结构是否有效
@@ -72,6 +74,39 @@ static void Drv_Rtc_SecondsToTime(uint32_t seconds, DrvRtcTime_t *time)
     time->second = (uint8_t)(seconds % 60UL);
 }
 
+static uint8_t Drv_Rtc_IsLeapYear(uint16_t year)
+{
+    return (uint8_t)(((year % 4U == 0U) && (year % 100U != 0U)) || (year % 400U == 0U));
+}
+
+static uint8_t Drv_Rtc_DaysInMonth(uint16_t year, uint8_t month)
+{
+    static const uint8_t days[] = {31U, 28U, 31U, 30U, 31U, 30U, 31U, 31U, 30U, 31U, 30U, 31U};
+    uint8_t d;
+
+    d = days[month - 1U];
+    if ((month == 2U) && (Drv_Rtc_IsLeapYear(year) != 0U))
+    {
+        d = 29U;
+    }
+    return d;
+}
+
+static void Drv_Rtc_AdvanceDate(DrvRtcDate_t *date)
+{
+    date->day++;
+    if (date->day > Drv_Rtc_DaysInMonth(date->year, date->month))
+    {
+        date->day = 1U;
+        date->month++;
+        if (date->month > 12U)
+        {
+            date->month = 1U;
+            date->year++;
+        }
+    }
+}
+
 /**
  * @brief  使能后备域访问权限
  * @param  无
@@ -116,6 +151,12 @@ static uint8_t Drv_Rtc_InitHardware(uint32_t default_seconds, uint8_t *used_back
 
     if (marker != RTC_BACKUP_MARKER)
     {
+        /* Check secondary marker: if previously configured, battery likely failed */
+        if (BKP_ReadBackupRegister(BKP_DR10) == RTC_BACKUP_MARKER)
+        {
+            g_rtc_backup_was_lost = 1U;
+        }
+
         RCC_BackupResetCmd(ENABLE);
         RCC_BackupResetCmd(DISABLE);
 
@@ -136,9 +177,13 @@ static uint8_t Drv_Rtc_InitHardware(uint32_t default_seconds, uint8_t *used_back
         RTC_WaitForLastTask();
 
         BKP_WriteBackupRegister(BKP_DR1, RTC_BACKUP_MARKER);
+        BKP_WriteBackupRegister(BKP_DR10, RTC_BACKUP_MARKER);
         *used_backup_time = 0U;
         return 1U;
     }
+
+    /* Marker valid: backup domain was preserved, no battery failure */
+    g_rtc_backup_was_lost = 0U;
 
     RCC_LSEConfig(RCC_LSE_ON);
     if (Drv_Rtc_WaitLseReady() == 0U)
@@ -177,6 +222,9 @@ DrvRtcSource_t Drv_Rtc_Init(const DrvRtcTime_t *default_time)
 
     g_software_seconds = Drv_Rtc_TimeToSeconds(&initial_time);
     g_software_ms = 0U;
+    g_software_date.year = 2026U;
+    g_software_date.month = 5U;
+    g_software_date.day = 7U;
     used_backup_time = 0U;
 
 #if APP_CLOCK_SIM_ENABLED
@@ -210,7 +258,12 @@ void Drv_Rtc_Task1ms(void)
     if (g_software_ms >= 1000U)
     {
         g_software_ms = 0U;
-        g_software_seconds = (g_software_seconds + 1UL) % RTC_SECONDS_PER_DAY;
+        g_software_seconds++;
+        if (g_software_seconds >= RTC_SECONDS_PER_DAY)
+        {
+            g_software_seconds = 0UL;
+            Drv_Rtc_AdvanceDate(&g_software_date);
+        }
     }
 }
 
@@ -276,4 +329,106 @@ void Drv_Rtc_SetTime(const DrvRtcTime_t *time)
 uint8_t Drv_Rtc_IsHardwareActive(void)
 {
     return g_rtc_hardware_active;
+}
+
+void Drv_Rtc_GetDate(DrvRtcDate_t *date)
+{
+    if (date == 0)
+    {
+        return;
+    }
+
+    if (g_rtc_hardware_active != 0U)
+    {
+        uint32_t total_days;
+        DrvRtcDate_t temp;
+        uint32_t i;
+
+        /* Compute days from epoch 2026-01-01 using RTC counter as total seconds */
+        total_days = RTC_GetCounter() / RTC_SECONDS_PER_DAY;
+        temp.year = 2026U;
+        temp.month = 1U;
+        temp.day = 1U;
+
+        for (i = 0UL; i < total_days; i++)
+        {
+            Drv_Rtc_AdvanceDate(&temp);
+        }
+        *date = temp;
+        return;
+    }
+
+    *date = g_software_date;
+}
+
+void Drv_Rtc_SetDate(const DrvRtcDate_t *date)
+{
+    if ((date == 0) ||
+        (date->year < 2000U) || (date->year > 2099U) ||
+        (date->month < 1U) || (date->month > 12U) ||
+        (date->day < 1U) || (date->day > 31U))
+    {
+        return;
+    }
+
+    g_software_date = *date;
+
+    if (g_rtc_hardware_active != 0U)
+    {
+        DrvRtcDate_t epoch;
+        uint32_t total_days;
+        uint32_t seconds_within_day;
+
+        epoch.year = 2026U;
+        epoch.month = 1U;
+        epoch.day = 1U;
+        total_days = 0UL;
+
+        while ((epoch.year < date->year) ||
+               (epoch.year == date->year && epoch.month < date->month) ||
+               (epoch.year == date->year && epoch.month == date->month && epoch.day < date->day))
+        {
+            Drv_Rtc_AdvanceDate(&epoch);
+            total_days++;
+        }
+
+        seconds_within_day = RTC_GetCounter() % RTC_SECONDS_PER_DAY;
+        RTC_WaitForLastTask();
+        RTC_SetCounter(total_days * RTC_SECONDS_PER_DAY + seconds_within_day);
+        RTC_WaitForLastTask();
+    }
+}
+
+uint8_t Drv_Rtc_GetDayOfWeek(const DrvRtcDate_t *date)
+{
+    uint16_t y;
+    uint8_t m;
+    uint16_t k;
+    uint16_t j;
+    int32_t h;
+
+    /* Zeller's Congruence: returns 0=Saturday, 1=Sunday, ..., 6=Friday */
+    y = date->year;
+    m = date->month;
+    if (m < 3U)
+    {
+        m += 12U;
+        y--;
+    }
+    k = y % 100U;
+    j = y / 100U;
+    h = ((int32_t)date->day
+         + (int32_t)((13U * ((uint16_t)m + 1U)) / 5U)
+         + (int32_t)k
+         + (int32_t)(k / 4U)
+         + (int32_t)(j / 4U)
+         - (int32_t)(2U * j)) % 7;
+
+    /* Convert: Zeller 0=Saturday -> return 0=Sunday */
+    return (uint8_t)((h + 1) % 7);
+}
+
+uint8_t Drv_Rtc_WasBackupLost(void)
+{
+    return g_rtc_backup_was_lost;
 }

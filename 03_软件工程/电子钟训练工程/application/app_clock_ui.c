@@ -228,6 +228,15 @@ void AppClockUi_Render(const ClockContext_t *clock,
     uint16_t screen_width;              /* LCD 当前横向像素宽度 */
     uint16_t time_bg_color;             /* 主时间区域背景色 */
 
+    if (clock->lcd_on == 0U)
+    {
+        BSP_LCD_BacklightOff();
+        BSP_LCD_FillScreen(BSP_LCD_COLOR_BLACK);
+        *ui_dirty = 0U;
+        return;
+    }
+    BSP_LCD_BacklightOn();
+
     screen_width = BSP_LCD_GetWidth();
     display_time = (AppClockCore_IsEditView(clock->view) != 0U) ? &clock->edit_time : now;
 
@@ -252,8 +261,24 @@ void AppClockUi_Render(const ClockContext_t *clock,
             clock->alarm_time.minute);
     BSP_LCD_DrawString(16U, 136U, line_buffer, BSP_LCD_COLOR_YELLOW, BSP_LCD_COLOR_BLACK, 2U);
 
-    sprintf(line_buffer, "RTC %s", AppClockCore_RtcSourceLabel(clock->rtc_source));
-    BSP_LCD_DrawString(16U, 160U, line_buffer, BSP_LCD_COLOR_GREEN, BSP_LCD_COLOR_BLACK, 2U);
+    /*
+     * Date display at Y=160.
+     * [需要人类补充] Temperature/humidity display requires external sensor hardware
+     * (e.g., DHT11/DHT22 on a GPIO, or SHT3x on I2C). When connected, add a sensor
+     * driver under drivers/ and display readings here (e.g., at Y=172).
+     */
+
+    /* Date display at Y=160 */
+    {
+        DrvRtcDate_t date;
+        const char *day_names[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+        uint8_t dow;
+
+        Drv_Rtc_GetDate(&date);
+        dow = Drv_Rtc_GetDayOfWeek(&date);
+        sprintf(line_buffer, "%04u-%02u-%02u %s", date.year, date.month, date.day, day_names[dow]);
+        BSP_LCD_DrawString(16U, 160U, line_buffer, BSP_LCD_COLOR_GREEN, BSP_LCD_COLOR_BLACK, 2U);
+    }
 
     if (AppClockCore_IsEditView(clock->view) != 0U)
     {
@@ -267,8 +292,21 @@ void AppClockUi_Render(const ClockContext_t *clock,
     }
     else
     {
-        sprintf(line_buffer, "MUTE %s  PHYS+TOUCH+IR", (clock->mute_enabled != 0U) ? "ON" : "OFF");
-        BSP_LCD_DrawString(16U, 184U, line_buffer, BSP_LCD_COLOR_GRAY, BSP_LCD_COLOR_BLACK, 2U);
+        if ((clock->rtc_source == DRV_RTC_SOURCE_HARDWARE_DEFAULT_TIME) &&
+            (Drv_Rtc_WasBackupLost() != 0U))
+        {
+            sprintf(line_buffer, "MUTE %s  RTC:%s  BAT:FAIL",
+                    (clock->mute_enabled != 0U) ? "ON" : "OFF",
+                    AppClockCore_RtcSourceLabel(clock->rtc_source));
+            BSP_LCD_DrawString(16U, 184U, line_buffer, BSP_LCD_COLOR_RED, BSP_LCD_COLOR_BLACK, 2U);
+        }
+        else
+        {
+            sprintf(line_buffer, "MUTE %s  RTC:%s",
+                    (clock->mute_enabled != 0U) ? "ON" : "OFF",
+                    AppClockCore_RtcSourceLabel(clock->rtc_source));
+            BSP_LCD_DrawString(16U, 184U, line_buffer, BSP_LCD_COLOR_GRAY, BSP_LCD_COLOR_BLACK, 2U);
+        }
     }
 
     if (clock->alarm_ringing != 0U)
@@ -280,20 +318,23 @@ void AppClockUi_Render(const ClockContext_t *clock,
     }
     else if (AppClockCore_IsEditView(clock->view) != 0U)
     {
-        AppClockUi_DrawTouchButton(APP_TOUCH_BUTTON_1, "NEXT", BSP_LCD_COLOR_BLUE, (uint8_t)(touch_ui->active_button == APP_TOUCH_BUTTON_1));
-        AppClockUi_DrawTouchButton(APP_TOUCH_BUTTON_2, "BACK", BSP_LCD_COLOR_ORANGE, (uint8_t)(touch_ui->active_button == APP_TOUCH_BUTTON_2));
-        AppClockUi_DrawTouchButton(APP_TOUCH_BUTTON_3, "PLUS", BSP_LCD_COLOR_GREEN, (uint8_t)(touch_ui->active_button == APP_TOUCH_BUTTON_3));
-        AppClockUi_DrawTouchButton(APP_TOUCH_BUTTON_4, "MINUS", BSP_LCD_COLOR_MAGENTA, (uint8_t)(touch_ui->active_button == APP_TOUCH_BUTTON_4));
+        AppClockUi_DrawTouchButton(APP_TOUCH_BUTTON_1, "OK", BSP_LCD_COLOR_BLUE, (uint8_t)(touch_ui->active_button == APP_TOUCH_BUTTON_1));
+        AppClockUi_DrawTouchButton(APP_TOUCH_BUTTON_2, "NEXT", BSP_LCD_COLOR_ORANGE, (uint8_t)(touch_ui->active_button == APP_TOUCH_BUTTON_2));
+        AppClockUi_DrawTouchButton(APP_TOUCH_BUTTON_3, "+", BSP_LCD_COLOR_GREEN, (uint8_t)(touch_ui->active_button == APP_TOUCH_BUTTON_3));
+        AppClockUi_DrawTouchButton(APP_TOUCH_BUTTON_4, "-", BSP_LCD_COLOR_MAGENTA, (uint8_t)(touch_ui->active_button == APP_TOUCH_BUTTON_4));
     }
     else
     {
         AppClockUi_DrawTouchButton(APP_TOUCH_BUTTON_1, "TIME", BSP_LCD_COLOR_BLUE, (uint8_t)(touch_ui->active_button == APP_TOUCH_BUTTON_1));
-        AppClockUi_DrawTouchButton(APP_TOUCH_BUTTON_2,
-                                   (clock->alarm_enabled != 0U) ? "OFF" : "ON",
-                                   BSP_LCD_COLOR_ORANGE,
-                                   (uint8_t)(touch_ui->active_button == APP_TOUCH_BUTTON_2));
-        AppClockUi_DrawTouchButton(APP_TOUCH_BUTTON_3, "STATE", BSP_LCD_COLOR_GREEN, (uint8_t)(touch_ui->active_button == APP_TOUCH_BUTTON_3));
-        AppClockUi_DrawTouchButton(APP_TOUCH_BUTTON_4, "ALARM", BSP_LCD_COLOR_MAGENTA, (uint8_t)(touch_ui->active_button == APP_TOUCH_BUTTON_4));
+        AppClockUi_DrawTouchButton(APP_TOUCH_BUTTON_2, "ALARM", BSP_LCD_COLOR_ORANGE, (uint8_t)(touch_ui->active_button == APP_TOUCH_BUTTON_2));
+        AppClockUi_DrawTouchButton(APP_TOUCH_BUTTON_3,
+                                   (clock->alarm_enabled != 0U) ? "AL OFF" : "AL ON",
+                                   BSP_LCD_COLOR_GREEN,
+                                   (uint8_t)(touch_ui->active_button == APP_TOUCH_BUTTON_3));
+        AppClockUi_DrawTouchButton(APP_TOUCH_BUTTON_4,
+                                   (clock->mute_enabled != 0U) ? "UNMUTE" : "MUTE",
+                                   BSP_LCD_COLOR_MAGENTA,
+                                   (uint8_t)(touch_ui->active_button == APP_TOUCH_BUTTON_4));
     }
 
     *ui_dirty = 0U;
