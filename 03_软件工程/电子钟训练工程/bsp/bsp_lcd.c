@@ -307,10 +307,12 @@ void BSP_LCD_BacklightOff(void)
 
 static void BSP_LCD_Reset(void)
 {
+    /* LCD reset requires ≥10ms low pulse + ≥50ms recovery before commands.
+       0xFFFFFU ≈ 1M volatile-loop iterations ≈ 50ms at 72 MHz. */
     GPIO_ResetBits(BSP_LCD_RST_PORT, BSP_LCD_RST_PIN);
-    BSP_LCD_Delay(0x0AFFU);
+    BSP_LCD_Delay(0x0FFFFFU);
     GPIO_SetBits(BSP_LCD_RST_PORT, BSP_LCD_RST_PIN);
-    BSP_LCD_Delay(0x0AFFU);
+    BSP_LCD_Delay(0x0FFFFFU);
 }
 
 static uint16_t BSP_LCD_ReadIdInternal(void)
@@ -654,6 +656,10 @@ static void BSP_LCD_DrawChar(uint16_t x,
 
 void BSP_LCD_Init(void)
 {
+    /* Wait for LCD power supply to stabilize (~80ms at 72MHz).
+       Without this, the LCD controller may miss the reset pulse. */
+    BSP_LCD_Delay(0x1FFFFFUL);
+
     BSP_LCD_GPIO_Config();
     BSP_LCD_FSMC_Config();
     BSP_LCD_BacklightOn();

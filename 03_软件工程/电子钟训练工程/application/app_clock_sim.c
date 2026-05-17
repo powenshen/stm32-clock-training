@@ -9,6 +9,8 @@
 #include "drv_systick.h"
 #include "sim_debug_config.h"
 
+#if APP_CLOCK_SIM_ENABLED
+
 #define APP_SIM_KEY_SETTLE_MS       25U
 #define APP_SIM_KEY_LONG_HOLD_MS    820U
 
@@ -553,3 +555,5 @@ void AppClockSim_Main(void)
     {
     }
 }
+
+#endif /* APP_CLOCK_SIM_ENABLED */
