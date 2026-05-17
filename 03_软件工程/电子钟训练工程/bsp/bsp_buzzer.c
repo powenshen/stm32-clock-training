@@ -1,7 +1,6 @@
 #include "bsp_buzzer.h"
 
 #include "board_config.h"
-#include "sim_debug_config.h"
 
 static uint8_t g_buzzer_state = 0U;
 
@@ -20,10 +19,6 @@ void BSP_Buzzer_Init(void)
 
     g_buzzer_state = 0U;
 
-#if APP_CLOCK_SIM_ENABLED
-    return;
-#endif
-
     RCC_APB2PeriphClockCmd(BOARD_BUZZER_RCC, ENABLE);
 
     gpio_init_structure.GPIO_Pin = BOARD_BUZZER_PIN;
@@ -38,9 +33,7 @@ void BSP_Buzzer_SetState(uint8_t is_on)
 {
     g_buzzer_state = (uint8_t)(is_on != 0U);
 
-#if !APP_CLOCK_SIM_ENABLED
     BSP_Buzzer_Write(g_buzzer_state);
-#endif
 }
 
 uint8_t BSP_Buzzer_GetState(void)
