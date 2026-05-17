@@ -1,18 +1,23 @@
 # Keil build outputs
 **/Objects/
 **/Listings/
+**/DebugConfig/
 
 # Keil user-specific files
 **/*.uvguix.*
 **/*.uvoptx
 
+# Keil generated files
+*.scvd
+
 # Common temporary files
 *.bak
 *.tmp
 *.log
+*.lock
 
-# Local temp folders
-**/99_临时文件/
+# Office temp lock files
+~$*
 
 # Python cache
 **/__pycache__/
