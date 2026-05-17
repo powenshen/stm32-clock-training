@@ -495,6 +495,16 @@ void AppClockCore_ToggleLcdPower(ClockContext_t *clock, uint8_t *ui_dirty)
  * @param  settings_dirty: 参数保存标志指针
  * @retval 无
  */
+/*
+ * Touch key mapping per PPT requirement 3:
+ *   KEY1 = 模式键 (BTN1): RUN→"TIME" enter time edit; EDIT→"OK" save/advance
+ *   KEY2 = 右移   (BTN2): RUN→"ALARM" enter alarm edit; EDIT→"NEXT" next field
+ *   KEY3 = 加1    (BTN3): RUN→"AL ON/OFF" toggle alarm; EDIT→"+" increment (long=repeat)
+ *   KEY4 = 减1    (BTN4): RUN→"MUTE" toggle mute; EDIT→"-" decrement (long=repeat)
+ *
+ * RUN-mode BTN3/BTN4 are practical extensions (alarm toggle & mute); PPT says
+ * "从实用易用的角度出发", the 4-key scheme can be adapted for usability.
+ */
 void AppClockCore_HandleTouchCommand(ClockContext_t *clock,
                                      AppTouchButtonId_t button_id,
                                      uint8_t is_hold_action,
