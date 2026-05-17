@@ -1,6 +1,5 @@
 #include "drv_rtc.h"
 
-#include "sim_debug_config.h"
 #include "stm32f10x_bkp.h"
 #include "stm32f10x_pwr.h"
 #include "stm32f10x_rcc.h"

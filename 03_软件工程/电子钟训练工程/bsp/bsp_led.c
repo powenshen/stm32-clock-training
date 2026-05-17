@@ -1,7 +1,6 @@
 #include "bsp_led.h"
 
 #include "board_config.h"
-#include "sim_debug_config.h"
 
 #define BSP_LED_ALL_MASK    (BSP_LED_RED_MASK | BSP_LED_GREEN_MASK | BSP_LED_BLUE_MASK)
 
@@ -22,10 +21,6 @@ void BSP_LED_Init(void)
 
     g_led_mask = 0U;
 
-#if APP_CLOCK_SIM_ENABLED
-    return;
-#endif
-
     RCC_APB2PeriphClockCmd(BOARD_LED_RCC, ENABLE);
 
     gpio_init_structure.GPIO_Pin = BOARD_LED_RED_PIN | BOARD_LED_GREEN_PIN | BOARD_LED_BLUE_PIN;
@@ -40,11 +35,9 @@ void BSP_LED_SetMask(uint8_t mask)
 {
     g_led_mask = (uint8_t)(mask & BSP_LED_ALL_MASK);
 
-#if !APP_CLOCK_SIM_ENABLED
     BSP_LED_WritePin(BOARD_LED_RED_PORT, BOARD_LED_RED_PIN, (uint8_t)((g_led_mask & BSP_LED_RED_MASK) != 0U));
     BSP_LED_WritePin(BOARD_LED_GREEN_PORT, BOARD_LED_GREEN_PIN, (uint8_t)((g_led_mask & BSP_LED_GREEN_MASK) != 0U));
     BSP_LED_WritePin(BOARD_LED_BLUE_PORT, BOARD_LED_BLUE_PIN, (uint8_t)((g_led_mask & BSP_LED_BLUE_MASK) != 0U));
-#endif
 }
 
 void BSP_LED_ToggleMask(uint8_t mask)

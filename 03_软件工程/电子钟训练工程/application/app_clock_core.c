@@ -4,7 +4,6 @@
  */
 #include "app_clock_core.h"
 
-#include <stdio.h>
 
 #include "bsp_buzzer.h"
 #include "bsp_led.h"
@@ -60,7 +59,6 @@ static void AppClockCore_EnterTimeEdit(ClockContext_t *clock, uint8_t *ui_dirty)
     clock->view = APP_VIEW_SET_TIME_HOUR;
     AppClockCore_RecordActivity(clock);
     AppClockCore_InvalidateUi(ui_dirty);
-    AppClockCore_PrintState(clock, "enter-time-edit");
 }
 
 /**
@@ -75,7 +73,6 @@ static void AppClockCore_EnterAlarmEdit(ClockContext_t *clock, uint8_t *ui_dirty
     clock->view = APP_VIEW_SET_ALARM_HOUR;
     AppClockCore_RecordActivity(clock);
     AppClockCore_InvalidateUi(ui_dirty);
-    AppClockCore_PrintState(clock, "enter-alarm-edit");
 }
 
 /**
@@ -89,7 +86,6 @@ static void AppClockCore_CancelEdit(ClockContext_t *clock, const char *reason, u
 {
     clock->view = APP_VIEW_RUN;
     AppClockCore_InvalidateUi(ui_dirty);
-    AppClockCore_PrintState(clock, reason);
 }
 
 /**
@@ -103,7 +99,6 @@ static void AppClockCore_SaveTimeEdit(ClockContext_t *clock, uint8_t *ui_dirty)
     Drv_Rtc_SetTime(&clock->edit_time);
     clock->view = APP_VIEW_RUN;
     AppClockCore_InvalidateUi(ui_dirty);
-    AppClockCore_PrintState(clock, "save-time");
 }
 
 /**
@@ -123,7 +118,6 @@ static void AppClockCore_SaveAlarmEdit(ClockContext_t *clock,
     clock->view = APP_VIEW_RUN;
     AppClockCore_InvalidateUi(ui_dirty);
     AppClockCore_InvalidateSettings(settings_dirty);
-    AppClockCore_PrintState(clock, "save-alarm");
 }
 
 /**
@@ -181,7 +175,6 @@ static void AppClockCore_AdjustEditValue(ClockContext_t *clock, int8_t delta, ui
 
     AppClockCore_RecordActivity(clock);
     AppClockCore_InvalidateUi(ui_dirty);
-    AppClockCore_PrintState(clock, (delta > 0) ? "adjust++" : "adjust--");
 }
 
 /**
@@ -223,7 +216,6 @@ static void AppClockCore_AdvanceEditView(ClockContext_t *clock,
 
     AppClockCore_RecordActivity(clock);
     AppClockCore_InvalidateUi(ui_dirty);
-    AppClockCore_PrintState(clock, "next-field");
 }
 
 /**
@@ -244,7 +236,6 @@ static void AppClockCore_StopAlarm(ClockContext_t *clock, const char *reason, ui
     clock->key_sound_active = 0U;
     BSP_Buzzer_Off();
     AppClockCore_InvalidateUi(ui_dirty);
-    AppClockCore_PrintState(clock, reason);
 }
 
 /**
@@ -260,7 +251,6 @@ static void AppClockCore_StartAlarm(ClockContext_t *clock, uint8_t *ui_dirty)
     clock->last_blink_tick = clock->alarm_start_tick;
     clock->blink_state = 1U;
     AppClockCore_InvalidateUi(ui_dirty);
-    AppClockCore_PrintState(clock, "alarm-start");
 }
 
 /**
@@ -446,33 +436,6 @@ const char *AppClockCore_EditFieldLabel(const ClockContext_t *clock)
     }
 }
 
-/**
- * @brief  打印当前电子钟状态到调试串口
- * @param  clock: 电子钟状态对象指针
- * @param  reason: 状态打印原因字符串
- * @retval 无
- */
-void AppClockCore_PrintState(const ClockContext_t *clock, const char *reason)
-{
-    DrvRtcTime_t now;  /* 当前 RTC 时间快照 */
-
-    Drv_Rtc_GetTime(&now);
-
-    printf("[%s] now=%02u:%02u:%02u view=%s alarm=%s %02u:%02u ring=%u mute=%u edit=%02u:%02u:%02u\n",
-           reason,
-           now.hour,
-           now.minute,
-           now.second,
-           AppClockCore_ViewName(clock->view),
-           (clock->alarm_enabled != 0U) ? "ON" : "OFF",
-           clock->alarm_time.hour,
-           clock->alarm_time.minute,
-           clock->alarm_ringing,
-           clock->mute_enabled,
-           clock->edit_time.hour,
-           clock->edit_time.minute,
-           clock->edit_time.second);
-}
 
 /**
  * @brief  切换闹钟使能状态
@@ -490,7 +453,6 @@ void AppClockCore_ToggleAlarmEnable(ClockContext_t *clock,
     clock->alarm_enabled = (uint8_t)!clock->alarm_enabled;
     AppClockCore_InvalidateUi(ui_dirty);
     AppClockCore_InvalidateSettings(settings_dirty);
-    AppClockCore_PrintState(clock, reason);
 }
 
 /**
@@ -509,7 +471,6 @@ void AppClockCore_ToggleMute(ClockContext_t *clock,
     clock->mute_enabled = (uint8_t)!clock->mute_enabled;
     AppClockCore_InvalidateUi(ui_dirty);
     AppClockCore_InvalidateSettings(settings_dirty);
-    AppClockCore_PrintState(clock, reason);
 }
 
 /**
@@ -522,98 +483,8 @@ void AppClockCore_ToggleLcdPower(ClockContext_t *clock, uint8_t *ui_dirty)
 {
     clock->lcd_on = (uint8_t)!clock->lcd_on;
     AppClockCore_InvalidateUi(ui_dirty);
-    AppClockCore_PrintState(clock, clock->lcd_on != 0U ? "lcd-on" : "lcd-off");
 }
 
-/**
- * @brief  处理物理按键事件并更新核心状态
- * @param  clock: 电子钟状态对象指针
- * @param  event: 按键事件
- * @param  ui_dirty: UI 刷新标志指针
- * @param  settings_dirty: 参数保存标志指针
- * @retval 无
- */
-/*
- * Hardware limitation: the board provides 2 physical keys (KEY1=PA0, KEY2=PC13).
- * The PPT requirement specifies 4 keys (KEY1=mode, KEY2=right-shift, KEY3=inc,
- * KEY4=dec). The 2-key mapping used here:
- *
- *   RUN mode:   KEY1 click = enter time edit,  KEY1 long = toggle alarm
- *               KEY2 click = debug print,       KEY2 long = enter alarm edit
- *   EDIT mode:  KEY1 click = next field,        KEY1 long = cancel edit
- *               KEY2 click = increment,          KEY2 long/repeat = decrement
- *
- * The 4-button touch UI and IR remote supplement the missing KEY3/KEY4 functions.
- */
-void AppClockCore_HandleKeyEvent(ClockContext_t *clock,
-                                 KeyEvent_t event,
-                                 uint8_t *ui_dirty,
-                                 uint8_t *settings_dirty)
-{
-    if (event.type == KEY_EVENT_TYPE_NONE)
-    {
-        return;
-    }
-
-    AppClockCore_TriggerKeySound(clock);
-
-    if (clock->alarm_ringing != 0U)
-    {
-        AppClockCore_StopAlarm(clock, "alarm-stop-key", ui_dirty);
-        return;
-    }
-
-    if (AppClockCore_IsEditView(clock->view) != 0U)
-    {
-        if ((event.key_id == KEY_ID_KEY1) && (event.type == KEY_EVENT_TYPE_CLICK))
-        {
-            AppClockCore_AdvanceEditView(clock, ui_dirty, settings_dirty);
-            return;
-        }
-
-        if ((event.key_id == KEY_ID_KEY1) && (event.type == KEY_EVENT_TYPE_LONG_PRESS))
-        {
-            AppClockCore_CancelEdit(clock, "cancel-edit", ui_dirty);
-            return;
-        }
-
-        if ((event.key_id == KEY_ID_KEY2) && (event.type == KEY_EVENT_TYPE_CLICK))
-        {
-            AppClockCore_AdjustEditValue(clock, 1, ui_dirty);
-            return;
-        }
-
-        if ((event.key_id == KEY_ID_KEY2) &&
-            ((event.type == KEY_EVENT_TYPE_LONG_PRESS) || (event.type == KEY_EVENT_TYPE_REPEAT)))
-        {
-            AppClockCore_AdjustEditValue(clock, -1, ui_dirty);
-        }
-        return;
-    }
-
-    if ((event.key_id == KEY_ID_KEY1) && (event.type == KEY_EVENT_TYPE_CLICK))
-    {
-        AppClockCore_EnterTimeEdit(clock, ui_dirty);
-        return;
-    }
-
-    if ((event.key_id == KEY_ID_KEY1) && (event.type == KEY_EVENT_TYPE_LONG_PRESS))
-    {
-        AppClockCore_ToggleAlarmEnable(clock, ui_dirty, settings_dirty, "alarm-toggle");
-        return;
-    }
-
-    if ((event.key_id == KEY_ID_KEY2) && (event.type == KEY_EVENT_TYPE_LONG_PRESS))
-    {
-        AppClockCore_EnterAlarmEdit(clock, ui_dirty);
-        return;
-    }
-
-    if ((event.key_id == KEY_ID_KEY2) && (event.type == KEY_EVENT_TYPE_CLICK))
-    {
-        AppClockCore_ToggleMute(clock, ui_dirty, settings_dirty, "key-mute-toggle");
-    }
-}
 
 /**
  * @brief  处理逻辑触摸按键命令

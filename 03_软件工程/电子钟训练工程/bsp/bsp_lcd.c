@@ -2,8 +2,6 @@
 
 #include <string.h>
 
-#include "sim_debug_config.h"
-
 #define BSP_LCD_CMD_ADDR                ((uint32_t)0x60000000U)
 #define BSP_LCD_DATA_ADDR               ((uint32_t)0x60020000U)
 #define BSP_LCD_FSMC_BANK               FSMC_Bank1_NORSRAM1
@@ -293,16 +291,12 @@ static void BSP_LCD_FSMC_Config(void)
 
 void BSP_LCD_BacklightOn(void)
 {
-#if !APP_CLOCK_SIM_ENABLED
     GPIO_ResetBits(BSP_LCD_BK_PORT, BSP_LCD_BK_PIN);
-#endif
 }
 
 void BSP_LCD_BacklightOff(void)
 {
-#if !APP_CLOCK_SIM_ENABLED
     GPIO_SetBits(BSP_LCD_BK_PORT, BSP_LCD_BK_PIN);
-#endif
 }
 
 static void BSP_LCD_Reset(void)

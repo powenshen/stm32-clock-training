@@ -1,6 +1,5 @@
 #include "drv_systick.h"
 
-#include "sim_debug_config.h"
 
 static volatile uint32_t g_systick_ms = 0U;  /* 全局 1ms 系统节拍计数 */
 
